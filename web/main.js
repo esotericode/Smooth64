@@ -2,10 +2,12 @@ import {createWorld,zones} from './world.js';
 import {loadCore,FixedClock} from './engine.js';
 import {Input} from './input.js';
 import {PlaygroundRenderer} from './renderer.js';
+import {CourseProgress} from './progress.js';
+import {actionCue} from './pose.js';
 
 const $=id=>document.getElementById(id);
 const canvas=$('game'),help=$('help');
-let core,renderer,input,previous,current,actions;
+let core,renderer,input,previous,current,actions,progress;
 let started=false,paused=false,slow=false,zoneIndex=0,last=0,frames=0,frameTime=0;
 let lastInput={x:0,y:0,buttons:0,yaw:0},helpWasPaused=false,toastTimer;
 const clock=new FixedClock();
@@ -27,7 +29,7 @@ function start() {
   if(!core||started)return;
   started=true;document.body.classList.add('playing');
   $('welcome').hidden=true;
-  for(const id of ['zones','tip','telemetry','toolbar'])$(id).hidden=false;
+  for(const id of ['zones','tip','telemetry','toolbar','challenge'])$(id).hidden=false;
   renderer.intro=false;reset();
   $('footer-left').textContent='DRAG TO ORBIT · SCROLL TO ZOOM';
 }
@@ -44,6 +46,12 @@ function toggleMesh() { renderer.wire.visible=!renderer.wire.visible;$('wire-but
 function tick() {
   lastInput=input.sample(renderer.yaw);previous=current;
   current=core.tick(lastInput);renderer.record(current);
+  const reached=progress.collect(current,actionName());
+  if(reached.length) {
+    const route=reached.at(-1).route,count=progress.route(route);
+    toast(progress.found.size===progress.sparks.length?'All 12 sparks found. Beautifully done!':
+      `${route} · ${count.found} / ${count.total} sparks${count.found===count.total?' · route complete!':''}`);
+  }
   if(current.position[1]<-1500 || current.health<256 || current.floor<-10000) {
     reset();toast('Back on your feet.');
   }
@@ -72,6 +80,13 @@ function renderHud() {
   $('height').textContent=Math.round(current.position[1]-current.floor);
   $('vertical').textContent=current.velocity[1].toFixed(2);
   $('tick').textContent=current.tick;
+  const cue=actionCue(actionName(),current,renderer.yaw);
+  $('move-cue').textContent=cue;$('move-cue').hidden=!cue;
+  $('spark-count').textContent=`${progress.found.size} / ${progress.sparks.length}`;
+  document.querySelectorAll('[data-zone]').forEach((button,i)=>{
+    const count=progress.route(zones[i].name),badge=button.querySelector('small');
+    if(badge)badge.textContent=count.total?`${count.found}/${count.total}`:'';
+  });
   const ctx=$('stick-display').getContext('2d');
   ctx.clearRect(0,0,100,100);ctx.strokeStyle='#193b3040';ctx.lineWidth=1.5;
   ctx.beginPath();ctx.arc(50,50,34,0,Math.PI*2);ctx.stroke();
@@ -88,7 +103,7 @@ function frame(now) {
     renderer.distance=Math.max(350,Math.min(2100,renderer.distance+delta.zoom));
     if(!paused)alpha=clock.advance(dt*(slow?.25:1),tick);
   }
-  renderer.draw(previous,current,alpha,dt,actionName());
+  renderer.draw(previous,current,alpha,dt,actionName(),actions[previous.action],progress.found);
   if(started)renderHud();
   frames++;frameTime+=dt;
   if(frameTime>=1) {
@@ -104,6 +119,7 @@ $('close-help').addEventListener('click',()=>help.close());
 $('help-done').addEventListener('click',()=>help.close());
 help.addEventListener('close',()=>{if(started)setPaused(helpWasPaused);input?.clear();canvas.focus();});
 $('reset-button').addEventListener('click',()=>reset());
+$('reset-sparks').addEventListener('click',()=>{progress.reset();renderHud();toast('Sparks are back. Try a new route.');canvas.focus();});
 $('pause-button').addEventListener('click',()=>{setPaused(!paused);canvas.focus();});
 $('step-button').addEventListener('click',()=>{setPaused(true);tick();renderHud();canvas.focus();});
 $('slow-button').addEventListener('click',()=>{toggleSlow();canvas.focus();});
@@ -119,6 +135,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden&&started)se
 
 try {
   const world=createWorld();
+  progress=new CourseProgress(world.sparks);
   const [wasm,actionResponse]=await Promise.all([fetch('smooth64.wasm'),fetch('actions.json')]);
   if(!wasm.ok||!actionResponse.ok)throw new Error('Could not load the movement files. Serve the web folder over HTTP.');
   [core,actions]=await Promise.all([wasm.arrayBuffer().then(loadCore),actionResponse.json()]);
@@ -128,7 +145,7 @@ try {
   current=core.reset(zones[0].position,zones[0].yaw);previous=current;
   zones.forEach((zone,index)=>{
     const button=document.createElement('button');button.dataset.zone=index;
-    button.innerHTML=`<b>${String(index+1).padStart(2,'0')}</b><span>${zone.name}</span>`;
+    button.innerHTML=`<b>${String(index+1).padStart(2,'0')}</b><span>${zone.name}</span><small></small>`;
     button.addEventListener('click',()=>reset(index));$('zone-list').append(button);
   });
   $('start').disabled=false;$('start').innerHTML='Enter playground <span>↗</span>';
