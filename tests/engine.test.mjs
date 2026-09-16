@@ -8,7 +8,7 @@ import {createWorld,zones} from '../web/world.js';
 const bytes=readFileSync(new URL('../web/smooth64.wasm',import.meta.url));
 const world=createWorld();
 
-test('all six playground spawns settle on their visible surfaces',async()=>{
+test('all playground spawns settle on their visible surfaces',async()=>{
   const core=await loadCore(bytes);core.loadWorld(world.triangles);
   for(const zone of zones) {
     core.reset(zone.position,zone.yaw);
