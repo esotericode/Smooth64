@@ -1,0 +1,100 @@
+name: Restore source and publish easy browser download
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/restore-and-package.yml', 'tools/package_browser.py']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: smooth64-recovery
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Restore the verified recovery archive once
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, pathlib, zipfile
+          root = pathlib.Path.cwd()
+          if (root / 'core/host.c').exists():
+              print('Source already restored; preserving current working source.')
+          else:
+              archive = root / 'Smooth64-everything.zip'
+              expected = 'f09c3b2586a1f20ca41a73e136faa64ae38748b721656394b8af943c99a60d15'
+              assert hashlib.sha256(archive.read_bytes()).hexdigest() == expected, 'Backup checksum mismatch'
+              with zipfile.ZipFile(archive) as z:
+                  manifest = json.loads(z.read('BACKUP-MANIFEST.json'))
+                  restored = 0
+                  for entry in z.infolist():
+                      path = pathlib.PurePosixPath(entry.filename)
+                      if entry.is_dir() or not path.parts or path.parts[0] != 'Smooth64': continue
+                      relative = pathlib.PurePosixPath(*path.parts[1:])
+                      if not relative.parts or '..' in relative.parts: raise ValueError('Unsafe backup path')
+                      if any(p in {'.git', 'build', '__pycache__', '.github'} for p in relative.parts): continue
+                      if relative.suffix in {'.pyc', '.o', '.s'}: continue
+                      data = z.read(entry)
+                      assert hashlib.sha256(data).hexdigest() == manifest[entry.filename], entry.filename
+                      target = root.joinpath(*relative.parts)
+                      # Never overwrite a newly added packaging/automation file.
+                      if target.exists() and relative.as_posix() != 'README.md':
+                          assert target.read_bytes() == data, f'Existing file differs: {relative}'
+                          continue
+                      target.parent.mkdir(parents=True, exist_ok=True)
+                      target.write_bytes(data)
+                      restored += 1
+                  print(f'Restored {restored} project files; original ZIP retained.')
+          PY
+      - name: Verify source and movement
+        run: |
+          python3 tools/check_vendor.py
+          python3 tools/build.py native
+          python3 -m unittest discover -s tests -v
+          node --test tests/*.test.mjs
+      - name: Build the offline browser game
+        run: python3 tools/package_browser.py
+      - name: Commit restored source and easy start instructions
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          readme = Path('README.md')
+          text = readme.read_text()
+          marker = '<!-- easy-browser-download -->'
+          if marker not in text:
+              quick = '\n\n' + marker + '\n## Play now — no setup\n\n[**Download Smooth64 for your browser**](https://github.com/esotericode/Smooth64/releases/latest/download/Smooth64-Browser.zip)\n\n1. Download and extract the ZIP.\n2. Double-click **Smooth64-Play.html**.\n3. Click **Enter playground**.\n\nWorks offline in Edge, Chrome, or Firefox. No installation, Python, terminal, compiler, or ROM required. **WASD** moves, **Space** jumps, **Shift** crouches, **J** attacks.\n\nThe original recovery ZIP is kept in this repository. The folders below contain the editable project source.\n'
+              text = text.replace('# Smooth64', '# Smooth64' + quick, 1)
+              readme.write_text(text)
+          ignore = Path('.gitignore')
+          text = ignore.read_text()
+          if '\ndist/\n' not in text: ignore.write_text(text.rstrip() + '\ndist/\n')
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add README.md core vendor web tests tools docs package.json .gitignore .gitattributes LICENSE THIRD_PARTY.md
+          if ! git diff --cached --quiet; then
+            git commit -m 'Restore verified Smooth64 sources and add offline browser packaging'
+            git push origin HEAD:main
+          fi
+      - name: Publish the playable download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view playground-v0.1.0 >/dev/null 2>&1; then
+            gh release create playground-v0.1.0 --target main --title 'Smooth64 — double-click to play' --notes 'Download Smooth64-Browser.zip, extract it, and double-click Smooth64-Play.html. Click Enter playground. No installation, Python, terminal, compiler, internet connection, or ROM is needed to play. WASD moves, Space jumps, Shift crouches, J attacks. The source and fidelity notes are in the repository. Complete N64 equivalence is not yet verified.'
+          fi
+          gh release upload playground-v0.1.0 dist/Smooth64-Browser.zip dist/Smooth64-Play.html --clobber
