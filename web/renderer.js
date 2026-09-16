@@ -1,4 +1,5 @@
 import * as T from './vendor/three.module.min.js';
+import {ExplorerRig} from './character.js';
 
 export class PlaygroundRenderer {
   constructor(canvas,world) {
@@ -21,7 +22,7 @@ export class PlaygroundRenderer {
     const sun=new T.DirectionalLight('#fff4d8',3.1);
     sun.position.set(-2800,6500,3600);sun.castShadow=true;
     sun.shadow.mapSize.set(2048,2048);
-    Object.assign(sun.shadow.camera,{left:-5000,right:5000,top:5000,bottom:-5000,near:100,far:13000});
+    Object.assign(sun.shadow.camera,{left:-8200,right:8200,top:8500,bottom:-8200,near:100,far:21000});
     sun.shadow.normalBias=3;sun.shadow.bias=-.0002;
     this.scene.add(sun);
     this.meshes=[];
@@ -56,24 +57,36 @@ export class PlaygroundRenderer {
     this.groundText('04  /  STEP BY STEP',-1780,4,3200,1250);
     this.groundText('05  /  ISLAND HOPPING',1300,4,-1800,1500);
     this.groundText('SMOOTH64',0,4,3150,1100);
+    this.groundText('07  /  LEDGE GARDEN',-5000,4,1900,1700);
+    this.groundText('08  /  WALL-KICK TOWER',-2200,4,-4300,1800);
+    this.groundText('09  /  SKYLINE CIRCUIT',1500,4,-3800,1800);
+    for(const [x,z,w,d] of [[-5000,-450,2300,6400],[0,-5350,7500,3000]]) {
+      const border=new T.LineLoop(new T.BufferGeometry().setFromPoints([
+        new T.Vector3(x-w/2,3,z-d/2),new T.Vector3(x+w/2,3,z-d/2),
+        new T.Vector3(x+w/2,3,z+d/2),new T.Vector3(x-w/2,3,z+d/2)
+      ]),new T.LineBasicMaterial({color:'#ecf0ce'}));this.scene.add(border);
+    }
+    for(const zone of world.zones.slice(6)) {
+      const [x,y,z]=zone.position;
+      const marker=new T.Mesh(new T.RingGeometry(110,123,48),new T.MeshBasicMaterial({color:'#537d6b',side:T.DoubleSide}));
+      marker.rotation.x=-Math.PI/2;marker.position.set(x,y+3,z);this.scene.add(marker);
+    }
     const ring=new T.Mesh(new T.RingGeometry(130,145,64),new T.MeshBasicMaterial({color:'#537d6b',side:T.DoubleSide}));
     ring.rotation.x=-Math.PI/2;ring.position.set(0,4,2350);this.scene.add(ring);
     const rail=new T.LineLoop(new T.BufferGeometry().setFromPoints([
       new T.Vector3(-3730,3,-3730),new T.Vector3(3730,3,-3730),new T.Vector3(3730,3,3730),new T.Vector3(-3730,3,3730)
     ]),new T.LineBasicMaterial({color:'#ecf0ce'}));this.scene.add(rail);
 
-    this.character=new T.Group();this.body=new T.Group();this.character.add(this.body);
-    const capsule=new T.Mesh(new T.CapsuleGeometry(37,86,8,20),new T.MeshStandardMaterial({color:'#eb612f',roughness:.42}));
-    capsule.position.y=80;capsule.castShadow=true;this.body.add(capsule);
-    const visor=new T.Mesh(new T.SphereGeometry(29,16,12),new T.MeshStandardMaterial({color:'#213830',roughness:.38}));
-    visor.scale.set(1,.52,.4);visor.position.set(0,109,31);this.body.add(visor);
-    for(const x of [-11,11]) {
-      const eye=new T.Mesh(new T.SphereGeometry(3.5,8,8),new T.MeshBasicMaterial({color:'#f8f3d1'}));
-      eye.position.set(x,110,43);this.body.add(eye);
-    }
-    const stripe=new T.Mesh(new T.TorusGeometry(37.2,2,6,32),new T.MeshStandardMaterial({color:'#f8d8b7'}));
-    stripe.rotation.x=Math.PI/2;stripe.position.y=55;this.body.add(stripe);
+    this.character=new ExplorerRig();
     this.scene.add(this.character);
+    this.sparks=(world.sparks||[]).map(spark=>{
+      const group=new T.Group();group.position.set(...spark.position);
+      const material=new T.MeshStandardMaterial({color:'#ffbd63',emissive:'#b95b19',emissiveIntensity:.25,roughness:.35});
+      const hoop=new T.Mesh(new T.TorusGeometry(43,4,8,40),material);group.add(hoop);
+      const gem=new T.Mesh(new T.OctahedronGeometry(19),material);group.add(gem);
+      this.scene.add(group);
+      return {...spark,group,hoop,gem};
+    });
     this.shadow=new T.Mesh(new T.CircleGeometry(45,32),new T.MeshBasicMaterial({color:'#30493e',transparent:true,opacity:.25,depthWrite:false}));
     this.shadow.rotation.x=-Math.PI/2;this.scene.add(this.shadow);
     this.trailPoints=[];
@@ -98,13 +111,14 @@ export class PlaygroundRenderer {
     this.yaw=cameraYaw;this.target.set(position[0],position[1]+100,position[2]);
     this.camera.position.copy(this.target).add(new T.Vector3(Math.sin(this.yaw)*950,510,Math.cos(this.yaw)*950));
     this.trailPoints=[];
+    this.trail.geometry.dispose();this.trail.geometry=new T.BufferGeometry();
   }
   record(state) {
     this.trailPoints.push(new T.Vector3(state.position[0],state.position[1]+8,state.position[2]));
     if(this.trailPoints.length>240)this.trailPoints.shift();
     this.trail.geometry.dispose();this.trail.geometry=new T.BufferGeometry().setFromPoints(this.trailPoints);
   }
-  draw(previous,current,alpha,dt,actionName) {
+  draw(previous,current,alpha,dt,actionName,previousName,found=new Set()) {
     const w=innerWidth,h=innerHeight;
     if(w!==this.width||h!==this.height) {
       this.width=w;this.height=h;this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();
@@ -113,13 +127,18 @@ export class PlaygroundRenderer {
     this.character.position.set(...p);
     let angle=current.yaw-previous.yaw;angle=((angle+32768)&65535)-32768;
     this.character.rotation.y=(previous.yaw+angle*alpha)*Math.PI/32768;
-    this.body.rotation.x=actionName.includes('DIVE')?-1.1:actionName.includes('LONG_JUMP')?-.35:0;
-    this.body.scale.y=actionName.includes('CROUCH')||actionName.includes('CRAWL')?.62:1;
+    this.character.animate(previous,current,alpha,previousName,actionName);
+    const time=(previous.tick+(current.tick-previous.tick)*alpha)/30;
+    for(const [i,spark] of this.sparks.entries()) {
+      spark.group.visible=!found.has(spark.id);
+      spark.group.position.y=spark.position[1]+Math.sin(time*2+i)*8;
+      spark.hoop.rotation.y=time*.7+i;spark.gem.rotation.y=-time*1.4;
+    }
     this.shadow.position.set(p[0],current.floor+3,p[2]);
-    this.shadow.visible=current.floor>-2000;
+    this.shadow.visible=current.floor>-2000&&!actionName.includes('LEDGE');
     this.shadow.material.opacity=Math.max(.05,.28-(p[1]-current.floor)/2400);
     if(!this.intro) {
-      const desiredTarget=new T.Vector3(p[0],p[1]+100,p[2]);
+      const desiredTarget=this.character.worldCenter.clone().add(new T.Vector3(0,20,0));
       this.target.lerp(desiredTarget,1-Math.exp(-dt*16));
       const offset=new T.Vector3(Math.sin(this.yaw)*Math.cos(this.pitch),Math.sin(this.pitch),Math.cos(this.yaw)*Math.cos(this.pitch));
       this.ray.set(this.target,offset);this.ray.far=this.distance;
