@@ -1,0 +1,40 @@
+name: Verify movement core
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  movement:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify upstream source and native behavior
+        run: |
+          python3 tools/check_vendor.py
+          python3 tools/build.py native
+          python3 -m unittest discover -s tests -v
+          node --test tests/*.test.mjs
+      - name: Obtain pinned WASI SDK
+        run: |
+          curl -fL --retry 3 https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/wasi-sdk-25.0-x86_64-linux.tar.gz -o /tmp/wasi.tar.gz
+          echo '52640dde13599bf127a95499e61d6d640256119456d1af8897ab6725bcf3d89c  /tmp/wasi.tar.gz' | sha256sum -c -
+          tar -xzf /tmp/wasi.tar.gz -C /tmp
+      - name: Rebuild browser core and compare trajectories
+        env:
+          WASI_SDK_PATH: /tmp/wasi-sdk-25.0-x86_64-linux
+        run: |
+          python3 tools/build.py wasm
+          node --test tests/*.test.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smooth64-playground
+          path: web/
+          retention-days: 14
