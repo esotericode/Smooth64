@@ -16,6 +16,14 @@ The original recovery ZIP is kept in this repository. The folders below contain 
 
 A ROM-free movement playground built around the actual Super Mario 64 US action code, with an original capsule character and an original test level.
 
+## Second edition — hands, feet, and a bigger playground
+
+The explorer now has orb gloves and little shoes, with procedural running, punching, kicking, flipping, diving, sliding, landing, hanging, and climbing poses. Ledge hangs place the body below the platform and keep the gloves planted at the lip. A camera-relative arrow shows which way to push to climb.
+
+The six original areas are joined by **Ledge garden**, **Wall-kick tower**, and **Skyline circuit**. Find **12 gold sparks** across the new routes; progress survives respawns until you reset the sparks or reload. Destination buttons jump directly to each area. The movement core and its compiled WASM are unchanged from the first edition.
+
+[Second-edition release notes](docs/releases/v0.2.0.md)
+
 This is a working foundation for movement fidelity, **not yet a verified, bit-exact recreation of every N64 behavior**. The movement state machine comes from the decompilation through libsm64; the collision host, camera, and presentation are different. [Fidelity and remaining work](docs/FIDELITY.md) describes exactly where that boundary is.
 
 ## Play
@@ -55,6 +63,7 @@ Touch devices get an analog pad and A/B/Z buttons. Keyboard buttons retain very 
 - Long jump: run, press Z, then A. Backflip: stand still, hold Z, then A.
 - Side somersault: reverse direction while running and jump during the turnaround.
 - Wall kick: jump into a wall and press A again during the contact window.
+- Ledge climb: while hanging, push **toward the platform** to climb after a brief settling pause. Press A for a quick climb. Pull away or press Z to drop. The direction is relative to the camera; the live cue points toward the platform.
 - Dive: B in the air at sufficient forward speed. At low speed, B gives a jump kick.
 - Ground pound: Z in the air. Crawling, braking, sliding, ledge grabs/climbs, crouch sliding, and slide recovery use the upstream actions too.
 
@@ -65,7 +74,7 @@ The core's original timings apply; there is no added coyote time, automatic bunn
 ```text
 core/               Small C host and public API; movement timing/root-motion tables
 vendor/libsm64/     Pinned upstream C actions, math, collision adapter, and headers
-web/                Original level, capsule rendering, input, camera, and debug UI
+web/                Original level, procedural character rig, input, camera, and debug UI
 tests/              Behavioral checks and native ↔ WASM frame-by-frame comparisons
 tools/              Build, serve, import, and provenance checks
 docs/               Fidelity, architecture, and verification notes
