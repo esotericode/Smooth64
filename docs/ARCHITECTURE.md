@@ -42,7 +42,10 @@ This first API is global and not thread-safe. It supports one world and one char
 - `engine.js`: WASM ABI and fixed-step accumulator; also used directly in Node verification.
 - `world.js`: authored integer triangle geometry, colored render surfaces, destination points.
 - `input.js`: keyboard, touch, standard gamepad, camera input. Core A/B/Z edge detection remains inside C.
-- `renderer.js`: Three.js, capsule, lighting, follow/orbit camera, camera obstruction ray, optional wireframe/trail.
+- `renderer.js`: Three.js, lighting, follow/orbit camera, camera obstruction ray, optional wireframe/trail, and spark display.
+- `character.js` / `pose.js`: original capsule-and-orb rig and pure procedural pose sampling. Hands, feet, body, and eyes interpolate between simulation snapshots. The camera follows the visible body, including below a ledge. Poses use the action name, animation clock, velocity, and tick; they never write back to the core. They are custom readable illustrations of actions, not the original game's skeletal animations.
+- `animation-timing.js`: loop bounds generated alongside `kinematics.inc.h`, to synchronize procedural poses with the core's animation clock.
+- `progress.js`: session-only spark collection, separate from physics. Uses the visible body center, so a ledge anchor alone cannot collect a spark above the platform.
 - `main.js`: pause/reset/step and HUD, simulation scheduling, recovery.
 
 Normal motion interpolates between the last two core positions. Pausing and stepping show the current state directly. Render interpolation, camera smoothing, squash/tilt, trail, and soft shadow never feed back into collision. Long frame stalls discard wall time rather than executing a backlog of stale controller input. The demo server serves only `web/` and binds localhost by default.
