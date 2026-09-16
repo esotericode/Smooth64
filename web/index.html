@@ -12,14 +12,14 @@
   <div class="vignette"></div>
   <header>
     <a class="brand" href="./" aria-label="Smooth64 home"><span class="brand-mark">s</span>smooth<span class="brand-number">64</span></a>
-    <span class="edition">MOVEMENT PLAYGROUND <i> / </i> 001</span>
+    <span class="edition">MOVEMENT PLAYGROUND <i> / </i> 002</span>
     <div class="header-actions"><span id="status" class="status"><i></i>Loading core</span><button id="help-button" aria-label="Open controls">Controls <kbd>?</kbd></button></div>
   </header>
 
   <section id="welcome" class="welcome">
     <span class="eyebrow"><span class="tiny-line"></span> A STUDY IN MOMENTUM</span>
     <h1>A little space.<br>A lot of <em>movement.</em></h1>
-    <p>Run, leap, slide, repeat. A familiar set of moves in a new playground, with a little orange explorer.</p>
+    <p>Run, leap, grab, repeat. An orange explorer, nine places to play, and twelve sparks waiting along the new trails.</p>
     <button id="start" class="primary" disabled>Preparing playground… <span>↗</span></button>
     <div class="welcome-foot"><span class="key-cluster">W A S D</span> to move <span class="dot">·</span><kbd>SPACE</kbd> to jump</div>
     <span class="welcome-detail">Keyboard + gamepad <span>•</span> No ROM required</span>
@@ -31,6 +31,11 @@
   </aside>
 
   <div id="tip" class="tip" hidden><span class="tip-dot"></span><span id="tip-text"></span></div>
+  <aside id="challenge" class="challenge" hidden aria-label="Challenge progress">
+    <span class="section-label">THE EXTRA MILE</span><strong><span id="spark-count">0 / 12</span> <small>sparks</small></strong>
+    <p>Find the gold sparks in areas 07–09.</p><button id="reset-sparks">Reset sparks ↺</button>
+  </aside>
+  <div id="move-cue" class="move-cue" hidden></div>
   <div id="paused" class="pause-banner" hidden>PAUSED <span>Press P to resume</span></div>
   <div id="toast" role="status" class="toast" hidden></div>
 
@@ -60,7 +65,7 @@
     <p>Speed comes from the stick. On keyboard, hold a direction to run or add Alt for a gentle walk.</p>
     <div class="controls-grid">
       <div><h3>The basics</h3><dl><dt>Move</dt><dd>WASD / arrows</dd><dt>Jump / A</dt><dd>Space</dd><dt>Attack / B</dt><dd>J or X</dd><dt>Crouch / Z</dt><dd>Shift or Z</dd><dt>Orbit camera</dt><dd>Drag / Q E</dd><dt>Zoom</dt><dd>Mouse wheel</dd></dl></div>
-      <div><h3>Put it together</h3><dl class="moves"><dt>Double / triple jump</dt><dd>Jump again just after landing; keep running for the third.</dd><dt>Long jump</dt><dd>Run → crouch → jump.</dd><dt>Backflip</dt><dd>Stand still → hold crouch → jump.</dd><dt>Side somersault</dt><dd>Run → reverse direction → jump during the turn.</dd><dt>Wall kick</dt><dd>Jump into a wall → press jump again on impact.</dd><dt>Dive / ground pound</dt><dd>B while moving fast in the air / Z while airborne. At low speed, B gives a jump kick.</dd></dl></div>
+      <div><h3>Put it together</h3><dl class="moves"><dt>Double / triple jump</dt><dd>Jump again just after landing; keep running for the third.</dd><dt>Long jump</dt><dd>Run → crouch → jump.</dd><dt>Backflip</dt><dd>Stand still → hold crouch → jump.</dd><dt>Side somersault</dt><dd>Run → reverse direction → jump during the turn.</dd><dt>Wall kick</dt><dd>Jump into a wall → press jump again on impact.</dd><dt>Ledge grab / climb</dt><dd>Catch a lip while descending. Release the stick to hang. Push toward the ledge to climb, or tap A / Space to pull up quickly. Pull away or press Z / Shift to drop. Stick climbing starts after a brief pause; the on-screen arrow follows your camera.</dd><dt>Ceiling hang</dt><dd>Hold A / Space under the green hanging frame. Keep holding it as you move.</dd><dt>Dive / ground pound</dt><dd>B while moving fast in the air / Z while airborne. At low speed, B gives a jump kick.</dd></dl></div>
     </div>
     <p class="gamepad-note">Gamepad: left stick moves, right stick orbits, A jumps, X/B attacks, either trigger crouches. Touch: left pad + A/B/Z.</p>
     <details><summary>About the movement core</summary><p>Original US movement actions and math from n64decomp via libsm64, running in C at 30 ticks per second. The collision adapter and host differ from the N64 game; complete 1:1 equivalence is not yet verified. No ROM or original visual/audio assets are used. See the repository’s fidelity notes for known limits.</p></details>
