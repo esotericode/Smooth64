@@ -1,0 +1,11 @@
+{
+  "name": "smooth64",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "python3 tools/serve.py",
+    "test": "python3 tools/build.py native && python3 -m unittest discover -s tests -v && node --test tests/*.test.mjs",
+    "build:wasm": "python3 tools/build.py wasm"
+  }
+}

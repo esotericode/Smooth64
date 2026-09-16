@@ -1,0 +1,17 @@
+# Source provenance
+
+| Component | Pinned source | Use |
+|---|---|---|
+| libsm64 | [fd11813208272b4271d92bd92feb8f3fdbe61be5](https://github.com/libsm64/libsm64/tree/fd11813208272b4271d92bd92feb8f3fdbe61be5) | Unmodified subset of C movement/actions, math, collision adapter and headers under `vendor/libsm64`. Upstream distributes CC0-1.0; its complete license is retained there. |
+| n64decomp/sm64 | [9921382a68bb0c865e5e45eb594d9c64db59b1af](https://github.com/n64decomp/sm64/tree/9921382a68bb0c865e5e45eb594d9c64db59b1af) | Source reference for raw stick processing; source-derived timing and root XYZ numerical records in `core/kinematics.inc.h`. Upstream license retained under `vendor/n64decomp-LICENSE.md`. |
+| Three.js | [0.180.0](https://github.com/mrdoob/three.js/tree/r180) | Rendering only. Two local ES modules; MIT license retained in `web/vendor/THREE-LICENSE.txt`. |
+
+`vendor/manifest.json` records SHA-256 for every vendored libsm64 file. Run `python3 tools/check_vendor.py` to detect accidental edits. No action source was shortened into a hand-tuned approximation.
+
+The public decomp's animation C files contain more than movement needs. The importer discards all skeletal rotation tracks and keeps the five timing/flag fields and first three translation channels. These values control action transitions and root motion; they are not a model/animation renderer. No ROM, model, texture, audio, Nintendo level geometry, or full skeletal pose files are included.
+
+Three.js npm tarball SHA-256: `ad66d724565ee29a2467277fa84daa5ed0211d6b8d446e9ef29f6bae0cd14144`.
+
+WASI SDK 25 Linux x86-64 build tool archive SHA-256: `52640dde13599bf127a95499e61d6d640256119456d1af8897ab6725bcf3d89c` (toolchain is not bundled).
+
+Smooth64's original host, level, frontend, tests, and documentation are provided under the MIT license in `LICENSE`. Upstream materials retain their respective notices. Smooth64 is an independent project, not affiliated with Nintendo.

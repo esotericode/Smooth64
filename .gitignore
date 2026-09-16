@@ -1,0 +1,12 @@
+build/
+node_modules/
+__pycache__/
+.zig-cache/
+.DS_Store
+*.z64
+*.n64
+*.v64
+*.o
+*.a
+*.so
+dist/

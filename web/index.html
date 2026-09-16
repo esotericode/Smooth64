@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#183a30">
+  <title>Smooth64 — Movement playground</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%231b382f'/%3E%3Crect x='21' y='9' width='22' height='46' rx='11' fill='%23ed713b'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="game" tabindex="0" aria-label="Smooth64 playable movement playground"></canvas>
+  <div class="vignette"></div>
+  <header>
+    <a class="brand" href="./" aria-label="Smooth64 home"><span class="brand-mark">s</span>smooth<span class="brand-number">64</span></a>
+    <span class="edition">MOVEMENT PLAYGROUND <i> / </i> 001</span>
+    <div class="header-actions"><span id="status" class="status"><i></i>Loading core</span><button id="help-button" aria-label="Open controls">Controls <kbd>?</kbd></button></div>
+  </header>
+
+  <section id="welcome" class="welcome">
+    <span class="eyebrow"><span class="tiny-line"></span> A STUDY IN MOMENTUM</span>
+    <h1>A little space.<br>A lot of <em>movement.</em></h1>
+    <p>Run, leap, slide, repeat. A familiar set of moves in a new playground, with a little orange explorer.</p>
+    <button id="start" class="primary" disabled>Preparing playground… <span>↗</span></button>
+    <div class="welcome-foot"><span class="key-cluster">W A S D</span> to move <span class="dot">·</span><kbd>SPACE</kbd> to jump</div>
+    <span class="welcome-detail">Keyboard + gamepad <span>•</span> No ROM required</span>
+  </section>
+
+  <aside id="zones" class="zones" hidden>
+    <div class="section-label">EXPLORE THE PLAYGROUND <button id="zones-toggle" aria-label="Collapse destinations">−</button></div>
+    <div id="zone-list"></div>
+  </aside>
+
+  <div id="tip" class="tip" hidden><span class="tip-dot"></span><span id="tip-text"></span></div>
+  <div id="paused" class="pause-banner" hidden>PAUSED <span>Press P to resume</span></div>
+  <div id="toast" role="status" class="toast" hidden></div>
+
+  <section id="telemetry" class="telemetry" hidden aria-label="Live movement state">
+    <div class="action-readout"><span class="section-label">CURRENT ACTION</span><strong id="action-name">Idle</strong><code id="action-code">0x0C400201</code></div>
+    <div class="speed-readout"><span class="section-label">FORWARD SPEED <small>u / tick</small></span><strong id="speed">0.00</strong><div class="speed-track"><span id="speed-bar"></span></div></div>
+    <div class="small-readouts"><span>HEIGHT <b id="height">0</b></span><span>VERTICAL <b id="vertical">0.00</b></span><span>TICK <b id="tick">0</b></span></div>
+    <canvas id="stick-display" width="100" height="100" aria-label="Live analog input"></canvas>
+  </section>
+
+  <nav id="toolbar" class="toolbar" hidden aria-label="Playground tools">
+    <button id="reset-button" title="Reset at selected destination (R)">↺ <span>Reset</span><kbd>R</kbd></button>
+    <button id="pause-button" title="Pause simulation (P)">Ⅱ <span>Pause</span><kbd>P</kbd></button>
+    <button id="step-button" title="Advance one simulation tick while paused (N)">▹ <span>Step</span><kbd>N</kbd></button>
+    <span class="divider"></span>
+    <button id="slow-button" aria-pressed="false" title="Toggle quarter speed (T)"><span id="time-scale">1× speed</span></button>
+    <button id="trail-button" aria-pressed="false" title="Show movement trail">Trail</button>
+    <button id="wire-button" aria-pressed="false" title="Show collision mesh (V)">Mesh</button>
+  </nav>
+  <footer><span id="footer-left">A NEW PLACE FOR A CLASSIC FEEL.</span><span id="render-stats">30 Hz physics <i> / </i> interpolated rendering</span></footer>
+
+  <div class="touch-ui"><div id="touch-stick" aria-label="Touch movement stick"><span></span></div><div class="touch-actions"><button data-touch="4">Z</button><button data-touch="2">B</button><button data-touch="1" class="jump-touch">A</button></div></div>
+
+  <dialog id="help">
+    <button id="close-help" class="close" aria-label="Close controls">×</button>
+    <span class="eyebrow">FIELD GUIDE</span><h2>Make your next move.</h2>
+    <p>Speed comes from the stick. On keyboard, hold a direction to run or add Alt for a gentle walk.</p>
+    <div class="controls-grid">
+      <div><h3>The basics</h3><dl><dt>Move</dt><dd>WASD / arrows</dd><dt>Jump / A</dt><dd>Space</dd><dt>Attack / B</dt><dd>J or X</dd><dt>Crouch / Z</dt><dd>Shift or Z</dd><dt>Orbit camera</dt><dd>Drag / Q E</dd><dt>Zoom</dt><dd>Mouse wheel</dd></dl></div>
+      <div><h3>Put it together</h3><dl class="moves"><dt>Double / triple jump</dt><dd>Jump again just after landing; keep running for the third.</dd><dt>Long jump</dt><dd>Run → crouch → jump.</dd><dt>Backflip</dt><dd>Stand still → hold crouch → jump.</dd><dt>Side somersault</dt><dd>Run → reverse direction → jump during the turn.</dd><dt>Wall kick</dt><dd>Jump into a wall → press jump again on impact.</dd><dt>Dive / ground pound</dt><dd>B while moving fast in the air / Z while airborne. At low speed, B gives a jump kick.</dd></dl></div>
+    </div>
+    <p class="gamepad-note">Gamepad: left stick moves, right stick orbits, A jumps, X/B attacks, either trigger crouches. Touch: left pad + A/B/Z.</p>
+    <details><summary>About the movement core</summary><p>Original US movement actions and math from n64decomp via libsm64, running in C at 30 ticks per second. The collision adapter and host differ from the N64 game; complete 1:1 equivalence is not yet verified. No ROM or original visual/audio assets are used. See the repository’s fidelity notes for known limits.</p></details>
+    <button id="help-done" class="primary">Got it <span>↗</span></button>
+  </dialog>
+  <script type="module" src="main.js"></script>
+</body>
+</html>
