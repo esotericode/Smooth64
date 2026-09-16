@@ -7,6 +7,9 @@ export const zones = [
   { name: 'Step by step', note: 'Try ledge grabs, backflips and short hops.', position: [-2850, 0, 2500], yaw: 16384, camera: -Math.PI / 2 },
   { name: 'Island hopping', note: 'Crouch while running, then jump across.', position: [100, 440, -2300], yaw: 16384, camera: -Math.PI / 2 },
   { name: 'Slippery business', note: 'A steep, very slippery surface.', position: [-3000, 800, -2450], yaw: 0, camera: Math.PI },
+  { name: 'Ledge garden', note: 'Three ledges, three sparks. Push toward the ledge to climb.', position: [-5000, 0, 1675], yaw: 32768, camera: 0 },
+  { name: 'Wall-kick tower', note: 'Alternate walls with A / Space. Aim toward the high rear terrace.', position: [-2200, 0, -4980], yaw: -16384, camera: Math.PI / 2 },
+  { name: 'Skyline circuit', note: 'Follow six sparks. Running long jumps will bridge the larger gaps.', position: [0, 280, -4230], yaw: 16384, camera: -Math.PI / 2 },
 ];
 
 export function createWorld() {
@@ -62,5 +65,35 @@ export function createWorld() {
   box(3600,0,1600,120,370,800,'#adbba9');
   box(3300,300,1600,720,100,800,'#adbba9',5);
   box(900,125,1550,600,100,700,'#c4d2b7');
-  return {triangles,shapes,zones};
+  // New wings meet the original slab edge-to-edge. Missed jumps have a recovery
+  // floor; none of the original six areas has been moved or resized.
+  box(-5000,-240,-450,2400,240,6500,'#d3d8cc');
+  box(0,-240,-5350,7600,240,3100,'#d3d8cc');
+  const sparks=[];
+  function spark(route,x,y,z) {
+    sparks.push({id:`${route}-${sparks.filter(s=>s.route===route).length+1}`,route,position:[x,y,z]});
+  }
+  // 270-unit rises: arrive below the lip, hang, then pull up.
+  for(const [z,height,width,depth] of [[750,300,900,650],[-150,570,780,550],[-1050,840,650,500]]) {
+    box(-5000,0,z,width,height,depth,'#dfcdb1');spark('Ledge garden',-5000,height+85,z);
+  }
+  // A return staircase beside the garden's final ledge.
+  for(let i=0;i<4;i++)box(-5600,0,-1050+i*390,320,640-i*160,390,'#c4d2b7');
+
+  // Narrow enough for consecutive wall kicks. The top terrace is behind the
+  // shaft, so there is no invisible cap preventing the ascent.
+  box(-2470,0,-5420,160,1550,1450,'#bfc5b6');
+  box(-1930,0,-5420,160,1550,1450,'#bfc5b6');
+  box(-2200,0,-6380,860,1300,470,'#b2c7ba');
+  spark('Wall-kick tower',-2200,440,-5190);
+  spark('Wall-kick tower',-2200,930,-5590);
+  spark('Wall-kick tower',-2200,1385,-6380);
+
+  const circuit=[[0,280,-4230,640,620],[1050,400,-4470,560,560],
+    [2200,520,-4730,580,580],[2780,520,-5840,660,600],
+    [1600,680,-6460,520,520],[400,800,-6400,720,660]];
+  for(const [x,height,z,width,depth] of circuit) {
+    box(x,0,z,width,height,depth,'#b2c7ba');spark('Skyline circuit',x,height+85,z);
+  }
+  return {triangles,shapes,zones,sparks};
 }
