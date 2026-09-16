@@ -5,6 +5,7 @@ No ROM reader, skeletal pose, model, texture, or audio import exists here.
 Usage: python3 tools/import_kinematics.py /path/to/n64decomp/sm64
 """
 import argparse
+import json
 from pathlib import Path
 import re
 import subprocess
@@ -47,6 +48,10 @@ def generate(source):
         lines.append("    {" + ",".join(map(str, meta)) + f",0,root_{i},index_{i},0" + "},")
     lines.append("};\n")
     (ROOT / "core/kinematics.inc.h").write_text("\n".join(lines))
+    timing = [[meta[3], meta[4]] for _, (meta, _, _) in sorted(entries.items())]
+    (ROOT / "web/animation-timing.js").write_text(
+        '// Loop bounds from core/kinematics.inc.h; no skeletal pose data.\n'
+        'export const animationTiming=' + json.dumps(timing, separators=(',', ':')) + ';\n')
     print(f"Generated {len(entries)} timing/root-motion records")
 
 
