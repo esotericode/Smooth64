@@ -76,6 +76,7 @@ async function playground() {
 
 test('the level stays inside the collision core limits',()=>{
   assert.ok(world.triangles.length<4096,`${world.triangles.length} triangles`);
+  assert.ok(world.shapes.length<40,`${world.shapes.length} draw groups`);
   for(const triangle of world.triangles)
     for(const vertex of triangle.vertices)
       for(const value of vertex)
@@ -161,6 +162,53 @@ test('every stepping stone and spire platform can be reached',async()=>{
   assert.ok(stones.every(n=>n>=6),`stepping stone hops: ${stones.join(',')}`);
   const spire=chain([[-3900,0,-3400],[-3300,160,-3900],[-3900,360,-3300],[-4500,560,-3900],[-3900,760,-4500],[-3300,960,-3900]],['run']);
   assert.ok(spire.every(n=>n>=5),`spire hops: ${spire.join(',')}`);
+});
+
+test('the expanse is climbable: gauntlet, city roofs, ziggurat, mesa',async()=>{
+  const [core,name]=await playground();
+  // Five shafts, each wider than the last, climbed by alternating wall kicks.
+  for(let k=0;k<5;k++) {
+    core.reset([0,0,6800+k*1000],32768);
+    let direction=1,peak=0,kicks=0,hold=0,run=0;
+    for(let i=0;i<400;i++) {
+      const state=core.state();
+      let buttons=0;
+      if(name(state)==='ACT_AIR_HIT_WALL'){buttons=1;hold=0;direction=-direction;kicks++;}
+      else if(!air(state)){if(run++>4){buttons=1;hold=4;run=0;}}
+      else if(hold-->0)buttons=1;
+      peak=Math.max(peak,core.tick({x:80*direction,y:0,buttons,yaw:0}).position[1]);
+    }
+    assert.ok(kicks>=6&&peak>1400+k*200,`shaft ${k}: ${kicks} kicks, peak ${Math.round(peak)}`);
+  }
+  // Block city roofs rise gently enough to be crossed without touching down.
+  const roof=(i,j)=>200+170*(i+j)+50*((i*3+j*7)%2);
+  const hops=(from,to,yaw,camera)=>{
+    let landings=0;
+    for(let jumpAt=0;jumpAt<24;jumpAt++) {
+      core.reset(from,yaw);
+      for(let t=0;t<60;t++) {
+        const state=core.tick({x:0,y:80,buttons:t>=jumpAt&&t<jumpAt+7?1:0,yaw:camera});
+        if(!air(state)) { if(Math.round(state.floor)===to)landings++; if(t>jumpAt+12)break; }
+      }
+    }
+    return landings;
+  };
+  for(let i=0;i<4;i++)
+    assert.ok(hops([6400+i*1200,roof(i,0),-2400],roof(i+1,0),16384,49152)>=4,`city roof ${i}`);
+  // Every ziggurat tier, from the one below it.
+  for(let i=0;i<7;i++) {
+    const half=(5000-660*i)/2;
+    assert.ok(hops([-9000,i?i*190:0,half+(i?170:700)],(i+1)*190,32768,0)>=6,`ziggurat tier ${i}`);
+  }
+  // The mesa: walkable up the north ramp, a butt slide down the east face.
+  core.reset([0,0,-4600],32768);
+  let top=0;
+  for(let i=0;i<160;i++) top=Math.max(top,core.tick({x:0,y:80,buttons:0,yaw:0}).position[1]);
+  assert.equal(top,1000,'the north ramp should walk all the way to the plateau');
+  core.reset([0,1000,-9000],16384);
+  let slid=false;
+  for(let i=0;i<200;i++) slid||=name(core.tick({x:0,y:80,buttons:0,yaw:-16384}))==='ACT_BUTT_SLIDE';
+  assert.ok(slid,'the east face should start a slide');
 });
 
 test('every animation the core can select produces a usable pose',()=>{

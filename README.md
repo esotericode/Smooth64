@@ -14,7 +14,7 @@ Works offline in Edge, Chrome, or Firefox. No installation, Python, terminal, co
 The original recovery ZIP is kept in this repository. The folders below contain the editable project source.
 
 
-A ROM-free movement playground built around the actual Super Mario 64 US action code, with an original capsule explorer — orb hands, orb feet, posed from the core's own animation state — and an original test level.
+A ROM-free movement playground built around the actual Super Mario 64 US action code, with an original capsule explorer — orb hands, orb feet, posed from the core's own animation state — and an original, large original level.
 
 This is a working foundation for movement fidelity, **not yet a verified, bit-exact recreation of every N64 behavior**. The movement state machine comes from the decompilation through libsm64; the collision host, camera, and presentation are different. [Fidelity and remaining work](docs/FIDELITY.md) describes exactly where that boundary is.
 
@@ -30,7 +30,11 @@ Open **http://localhost:8000** and select **Enter playground**. On Windows, `py 
 
 Python 3 and a current browser with WebGL 2/WebAssembly are all you need. The compiled movement core and renderer are included. No npm install, compiler, ROM, CDN, or account is needed to play. Opening `index.html` directly as a `file:` URL will not work; use the local server. The `web/` directory is also a complete static build suitable for a normal HTTP server.
 
-The playground has eleven destinations — a runway, walkable ramps, a steep slippery slope, a wall-kick corridor, stairs, separated platforms, a 400-unit chimney to climb with alternating wall kicks, a gallery of lips to grab and climb, a chain of stepping stones, a hangable rafter crossing, and a tower to circle to its summit — plus a crouch tunnel with a hangable ceiling on the way between them. Use the destination panel to move between them. Reset, pause, single-tick stepping, quarter speed, trajectory trails, collision wireframes, and live action/animation/velocity/stick readouts are built in.
+The level is a walled **courtyard** inside a very large open **expanse**, 24,000 units across.
+
+The courtyard holds eleven experiments — a runway, walkable ramps, a steep slippery slope, a wall-kick corridor, stairs, separated platforms, a 400-unit chimney to climb with alternating wall kicks, a gallery of lips to grab and climb, a chain of stepping stones, a hangable rafter crossing, and a tower to circle to its summit — plus a crouch tunnel with a hangable ceiling on the way between them.
+
+A gate in each courtyard wall opens onto the expanse: a city of twenty-five roofs that rise gently enough to be crossed without touching the ground, five wall-kick shafts of increasing width and height, a seven-tier ziggurat, a mesa with a walkable ramp up one face and a slide down another, chains of blocks out to the corners, and loose blocks scattered across the open ground. Running from one wall to the other takes the better part of a minute. Use the destination panel to jump between all sixteen. Reset, pause, single-tick stepping, quarter speed, trajectory trails, collision wireframes, and live action/animation/velocity/stick readouts are built in.
 
 The explorer is posed from the movement core's own state: the action code picks an animation and advances its frame, and the orb hands and feet follow that animation and frame, so a run cycle, a punch, a ledge grab, a wall kick and a ceiling hang each read differently. The poses themselves are original; see [fidelity](docs/FIDELITY.md) for exactly what that does and does not inherit from the original.
 

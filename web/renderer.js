@@ -12,19 +12,20 @@ export class PlaygroundRenderer {
     this.renderer.toneMappingExposure=1.3;
     this.scene=new T.Scene();
     this.scene.background=new T.Color('#b8c7bf');
-    this.scene.fog=new T.Fog('#b8c7bf',9000,20000);
-    this.camera=new T.PerspectiveCamera(52,1,10,24000);
+    this.scene.fog=new T.Fog('#b8c7bf',14000,38000);
+    this.camera=new T.PerspectiveCamera(52,1,10,42000);
     this.camera.position.set(5400,4700,6700);
     this.camera.lookAt(0,0,0);
     this.target=new T.Vector3();
     this.distance=950;this.pitch=.43;this.yaw=0;
     this.scene.add(new T.HemisphereLight('#f6f7de','#687f74',2.1));
-    const sun=new T.DirectionalLight('#fff4d8',3.1);
-    sun.position.set(-2800,6500,3600);sun.castShadow=true;
-    sun.shadow.mapSize.set(2048,2048);
-    Object.assign(sun.shadow.camera,{left:-6200,right:6200,top:6200,bottom:-6200,near:100,far:15000});
-    sun.shadow.normalBias=3;sun.shadow.bias=-.0002;
-    this.scene.add(sun);
+    // The sun follows the explorer: one shadow map cannot cover the whole land.
+    this.sun=new T.DirectionalLight('#fff4d8',3.1);
+    this.sun.position.set(-2800,6500,3600);this.sun.castShadow=true;
+    this.sun.shadow.mapSize.set(2048,2048);
+    Object.assign(this.sun.shadow.camera,{left:-3400,right:3400,top:3400,bottom:-3400,near:100,far:13000});
+    this.sun.shadow.normalBias=3;this.sun.shadow.bias=-.0002;
+    this.scene.add(this.sun);this.scene.add(this.sun.target);
     this.meshes=[];
     for(const shape of world.shapes) {
       const positions=[],colors=[];
@@ -46,6 +47,8 @@ export class PlaygroundRenderer {
     this.wire.visible=false;this.scene.add(this.wire);
     const grid=new T.GridHelper(9600,48,'#7a958a','#9eaea2');
     grid.position.y=1;grid.material.transparent=true;grid.material.opacity=.32;this.scene.add(grid);
+    const far=new T.GridHelper(24000,24,'#8ba396','#a3b2a6');
+    far.position.y=1;far.material.transparent=true;far.material.opacity=.16;this.scene.add(far);
     // Floor markings are decorative and never alter collision.
     this.marking(0,1,0,750,4300,'#c1c9bb');
     for(const x of [-385,385]) this.marking(x,2,0,10,4300,'#718d7a');
@@ -62,6 +65,11 @@ export class PlaygroundRenderer {
     this.groundText('09  /  STEPPING STONES',800,4,1050,1000);
     this.groundText('10  /  THE RAFTERS',-2100,4,2950,900);
     this.groundText('11  /  THE SPIRE',-2650,4,-2650,800);
+    this.groundText('12  /  THE EAST GATE',4150,4,-1200,900);
+    this.groundText('13  /  BLOCK CITY',8800,4,-3500,1200);
+    this.groundText('14  /  WALL GAUNTLET',-2200,4,6700,1200);
+    this.groundText('15  /  THE ZIGGURAT',-9000,4,3300,1300);
+    this.groundText('16  /  THE MESA',0,4,-4300,1000);
     this.groundText('SMOOTH64',0,4,3150,1100);
     const ring=new T.Mesh(new T.RingGeometry(130,145,64),new T.MeshBasicMaterial({color:'#537d6b',side:T.DoubleSide}));
     ring.rotation.x=-Math.PI/2;ring.position.set(0,4,2350);this.scene.add(ring);
@@ -116,6 +124,8 @@ export class PlaygroundRenderer {
     this.shadow.position.set(p[0],current.floor+3,p[2]);
     this.shadow.visible=current.floor>-2000;
     this.shadow.material.opacity=Math.max(.05,.28-(p[1]-current.floor)/2400);
+    this.sun.position.set(p[0]-2800,p[1]+6500,p[2]+3600);
+    this.sun.target.position.set(p[0],p[1],p[2]);this.sun.target.updateMatrixWorld();
     if(!this.intro) {
       const desiredTarget=new T.Vector3(p[0],p[1]+100,p[2]);
       this.target.lerp(desiredTarget,1-Math.exp(-dt*16));

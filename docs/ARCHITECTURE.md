@@ -40,9 +40,9 @@ This first API is global and not thread-safe. It supports one world and one char
 ## Browser host
 
 - `engine.js`: WASM ABI and fixed-step accumulator; also used directly in Node verification.
-- `world.js`: authored integer triangle geometry, colored render surfaces, destination points.
+- `world.js`: authored integer triangle geometry, colored render surfaces, destination points. Triangles are emitted in groups; the renderer draws one merged mesh per group, so the draw call count stays flat as the level grows.
 - `input.js`: keyboard, touch, standard gamepad, camera input. Core A/B/Z edge detection remains inside C.
-- `renderer.js`: Three.js, world meshes, lighting, follow/orbit camera, camera obstruction ray, optional wireframe/trail.
+- `renderer.js`: Three.js, world meshes, lighting, follow/orbit camera, camera obstruction ray, optional wireframe/trail. One shadow map cannot cover a 24,000-unit level, so the sun and its shadow frustum follow the explorer.
 - `animations.js`: generated animation names and loop ranges, plus the loop phase for a frame. `tools/export_animations.py` regenerates it from the pinned header and `core/kinematics.inc.h`.
 - `poses.js`: pose targets per animation, with no Three.js dependency, so Node tests can check every animation the core can select.
 - `character.js`: the explorer's rig — capsule body, head, orb hands and feet — and the frame-rate-independent blend toward the current pose target.

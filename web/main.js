@@ -87,7 +87,7 @@ function frame(now) {
     const delta=input.cameraDelta(dt);
     renderer.yaw+=delta.yaw;
     renderer.pitch=Math.max(.12,Math.min(1.25,renderer.pitch+delta.pitch));
-    renderer.distance=Math.max(350,Math.min(2100,renderer.distance+delta.zoom));
+    renderer.distance=Math.max(350,Math.min(3200,renderer.distance+delta.zoom));
     if(!paused)alpha=clock.advance(dt*(slow?.25:1),tick);
   }
   renderer.draw(previous,current,alpha,dt,actionName());
@@ -129,6 +129,10 @@ try {
   input=new Input(canvas,command);
   current=core.reset(zones[0].position,zones[0].yaw);previous=current;
   zones.forEach((zone,index)=>{
+    if(zone.section) {
+      const label=document.createElement('span');
+      label.className='zone-section';label.textContent=zone.section;$('zone-list').append(label);
+    }
     const button=document.createElement('button');button.dataset.zone=index;
     button.innerHTML=`<b>${String(index+1).padStart(2,'0')}</b><span>${zone.name}</span>`;
     button.addEventListener('click',()=>reset(index));$('zone-list').append(button);
