@@ -14,7 +14,7 @@ Works offline in Edge, Chrome, or Firefox. No installation, Python, terminal, co
 The original recovery ZIP is kept in this repository. The folders below contain the editable project source.
 
 
-A ROM-free movement playground built around the actual Super Mario 64 US action code, with an original capsule character and an original test level.
+A ROM-free movement playground built around the actual Super Mario 64 US action code, with an original capsule explorer — orb hands, orb feet, posed from the core's own animation state — and an original test level.
 
 This is a working foundation for movement fidelity, **not yet a verified, bit-exact recreation of every N64 behavior**. The movement state machine comes from the decompilation through libsm64; the collision host, camera, and presentation are different. [Fidelity and remaining work](docs/FIDELITY.md) describes exactly where that boundary is.
 
@@ -30,7 +30,9 @@ Open **http://localhost:8000** and select **Enter playground**. On Windows, `py 
 
 Python 3 and a current browser with WebGL 2/WebAssembly are all you need. The compiled movement core and renderer are included. No npm install, compiler, ROM, CDN, or account is needed to play. Opening `index.html` directly as a `file:` URL will not work; use the local server. The `web/` directory is also a complete static build suitable for a normal HTTP server.
 
-The playground contains a runway, walkable ramps, a steep slippery slope, a wall-kick corridor, stairs, ledges, separated platforms, a low ceiling, and a hangable ceiling. Use the destination panel to move between experiments. Reset, pause, single-tick stepping, quarter speed, trajectory trails, collision wireframes, and live action/velocity/stick readouts are built in.
+The playground has eleven destinations — a runway, walkable ramps, a steep slippery slope, a wall-kick corridor, stairs, separated platforms, a 400-unit chimney to climb with alternating wall kicks, a gallery of lips to grab and climb, a chain of stepping stones, a hangable rafter crossing, and a tower to circle to its summit — plus a crouch tunnel with a hangable ceiling on the way between them. Use the destination panel to move between them. Reset, pause, single-tick stepping, quarter speed, trajectory trails, collision wireframes, and live action/animation/velocity/stick readouts are built in.
+
+The explorer is posed from the movement core's own state: the action code picks an animation and advances its frame, and the orb hands and feet follow that animation and frame, so a run cycle, a punch, a ledge grab, a wall kick and a ceiling hang each read differently. The poses themselves are original; see [fidelity](docs/FIDELITY.md) for exactly what that does and does not inherit from the original.
 
 | Control | Keyboard | Standard gamepad |
 |---|---|---|
@@ -56,7 +58,9 @@ Touch devices get an analog pad and A/B/Z buttons. Keyboard buttons retain very 
 - Side somersault: reverse direction while running and jump during the turnaround.
 - Wall kick: jump into a wall and press A again during the contact window.
 - Dive: B in the air at sufficient forward speed. At low speed, B gives a jump kick.
-- Ground pound: Z in the air. Crawling, braking, sliding, ledge grabs/climbs, crouch sliding, and slide recovery use the upstream actions too.
+- Ground pound: Z in the air. Crawling, braking, sliding, crouch sliding, and slide recovery use the upstream actions too.
+- Ledge grab: fall against a lip just above you to catch it, then A to climb up or Z to let go.
+- Ceiling hang: jump into a hangable ceiling with A held, then push a direction to shuffle along it.
 
 The core's original timings apply; there is no added coyote time, automatic bunny hopping, or variable-delta acceleration.
 
@@ -65,13 +69,13 @@ The core's original timings apply; there is no added coyote time, automatic bunn
 ```text
 core/               Small C host and public API; movement timing/root-motion tables
 vendor/libsm64/     Pinned upstream C actions, math, collision adapter, and headers
-web/                Original level, capsule rendering, input, camera, and debug UI
+web/                Original level, explorer rig, rendering, input, camera, and debug UI
 tests/              Behavioral checks and native ↔ WASM frame-by-frame comparisons
-tools/              Build, serve, import, and provenance checks
+tools/              Build, serve, import, export, and provenance checks
 docs/               Fidelity, architecture, and verification notes
 ```
 
-The renderer uses Three.js only to draw. It does not provide character physics. Collision and visible geometry are generated from the same integer-coordinate triangle list. The C core advances at exactly **30 Hz**; the display interpolates positions independently. Animation clocks also advance at simulation rate even though no original character model is drawn.
+The renderer uses Three.js only to draw. It does not provide character physics. Collision and visible geometry are generated from the same integer-coordinate triangle list. The C core advances at exactly **30 Hz**; the display interpolates positions independently. Animation clocks also advance at simulation rate even though no original character model is drawn; the rig reads the resulting animation id and frame and poses original geometry from them.
 
 `core/smooth64.h` is the engine integration boundary. The same C code can be linked into a raylib/SDL/custom native host; WebAssembly is just the first frontend. This initial API is deliberately **single-world, single-character, static geometry**.
 

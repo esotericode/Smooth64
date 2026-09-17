@@ -4,11 +4,13 @@ import {readFileSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {loadCore,FixedClock} from '../web/engine.js';
 import {createWorld,zones} from '../web/world.js';
+import {animations,animationName,animationPhase} from '../web/animations.js';
+import {poseFor} from '../web/poses.js';
 
 const bytes=readFileSync(new URL('../web/smooth64.wasm',import.meta.url));
 const world=createWorld();
 
-test('all six playground spawns settle on their visible surfaces',async()=>{
+test('every playground spawn settles on its visible surface',async()=>{
   const core=await loadCore(bytes);core.loadWorld(world.triangles);
   for(const zone of zones) {
     core.reset(zone.position,zone.yaw);
@@ -62,4 +64,141 @@ test('pause/reset clears fractional accumulated time',()=>{
   clock.advance(.02,()=>ticks++);clock.reset();clock.advance(.02,()=>ticks++);
   assert.equal(ticks,0);
   clock.advance(20,()=>ticks++);assert.ok(ticks<=8,'stalls must not replay minutes of input');
+});
+
+const air=state=>!!(state.action&0x800);
+const named=(state,actions)=>actions[state.action]||`ACT_${state.action.toString(16)}`;
+async function playground() {
+  const core=await loadCore(bytes);core.loadWorld(world.triangles);
+  const actions=JSON.parse(readFileSync(new URL('../web/actions.json',import.meta.url),'utf8'));
+  return [core,state=>named(state,actions)];
+}
+
+test('the level stays inside the collision core limits',()=>{
+  assert.ok(world.triangles.length<4096,`${world.triangles.length} triangles`);
+  for(const triangle of world.triangles)
+    for(const vertex of triangle.vertices)
+      for(const value of vertex)
+        assert.ok(Number.isInteger(value)&&Math.abs(value)<=32767,`bad coordinate ${value}`);
+});
+
+test('the chimney is climbable with alternating wall kicks',async()=>{
+  const [core,name]=await playground();
+  core.reset(zones[6].position,zones[6].yaw);
+  let direction=1,peak=0,kicks=0,hold=0,run=0;
+  for(let i=0;i<300;i++) {
+    const state=core.state();
+    let buttons=0;
+    // Press A on contact, exactly as a player must: the kick needs a new press.
+    if(name(state)==='ACT_AIR_HIT_WALL'){buttons=1;hold=0;direction=-direction;kicks++;}
+    else if(!air(state)){if(run++>4){buttons=1;hold=4;run=0;}}
+    else if(hold-->0)buttons=1;
+    peak=Math.max(peak,core.tick({x:80*direction,y:0,buttons,yaw:0}).position[1]);
+  }
+  assert.ok(kicks>=6,`only ${kicks} wall kicks`);
+  assert.ok(peak>1200,`reached ${peak}, below the balcony`);
+});
+
+test('every ledge in the gallery can be grabbed, and a grab can be climbed',async()=>{
+  const [core,name]=await playground();
+  const grab=(start,jumpAt)=>{
+    core.reset(start,0);
+    for(let i=0;i<70;i++) {
+      const state=core.tick({x:0,y:80,buttons:i>=jumpAt&&i<jumpAt+6?1:0,yaw:32768});
+      if(name(state)==='ACT_LEDGE_GRAB')return state;
+    }
+    return null;
+  };
+  for(let lip=0;lip<5;lip++) {
+    const start=[-1100,lip?130*lip:0,-2350+lip*720];
+    const timings=[...Array(30).keys()].filter(t=>grab(start,t+4));
+    assert.ok(timings.length>=8,`lip ${lip} grabbed from only ${timings.length} timings`);
+  }
+  assert.ok(grab([-1100,0,-2350],8));
+  let climbed=null;
+  for(let i=0;i<60&&!climbed;i++) {
+    const state=core.tick({x:0,y:0,buttons:i<3?1:0,yaw:32768});
+    if(!air(state)&&!name(state).includes('LEDGE'))climbed=state;
+  }
+  assert.equal(climbed.position[1],130*2); // stood up, then hopped the next lip
+});
+
+test('the rafters can be caught and crossed hand over hand',async()=>{
+  const [core,name]=await playground();
+  core.reset(zones[9].position,zones[9].yaw);
+  let caught=null,moving=null,far=0;
+  for(let i=0;i<300;i++) {
+    const state=core.state();
+    const hanging=name(state).includes('HANG');
+    const buttons=hanging||(!air(state)&&state.position[2]>3380)||(air(state)&&state.velocity[1]>0)?1:0;
+    const next=core.tick({x:0,y:80,buttons,yaw:32768});
+    if(!caught&&name(next)==='ACT_START_HANGING')caught=next;
+    if(name(next)==='ACT_HANG_MOVING'){moving=next;far=Math.max(far,next.position[2]);}
+  }
+  assert.ok(caught,'never caught the hangable ceiling');
+  assert.equal(moving.position[1],560-160); // hangs exactly 160 below the ceiling
+  assert.ok(far>4300,`crossed only to ${far}`);
+});
+
+test('every stepping stone and spire platform can be reached',async()=>{
+  const [core]=await playground();
+  const chain=(spots,moves)=>spots.slice(0,-1).map((from,i)=>{
+    const to=spots[i+1];
+    const yaw=Math.round(Math.atan2(to[0]-from[0],to[2]-from[2])*32768/Math.PI)&65535;
+    let landings=0;
+    for(let jumpAt=0;jumpAt<24;jumpAt++)for(const move of moves) {
+      core.reset(from,yaw);
+      for(let t=0;t<80;t++) {
+        const buttons=move==='run'?(t>=jumpAt&&t<jumpAt+7?1:0)
+          :(t===jumpAt?4:t>jumpAt&&t<jumpAt+7?5:0);
+        const state=core.tick({x:0,y:80,buttons,yaw:(yaw+32768)&65535});
+        if(!air(state)) { if(Math.round(state.floor)===to[1])landings++; if(t>jumpAt+12)break; }
+      }
+    }
+    return landings;
+  });
+  const stones=chain([[800,0,1050],[800,260,600],[1000,360,100],[800,460,-460],[1000,560,-1060],[820,700,-1700]],['run','longjump']);
+  assert.ok(stones.every(n=>n>=6),`stepping stone hops: ${stones.join(',')}`);
+  const spire=chain([[-3900,0,-3400],[-3300,160,-3900],[-3900,360,-3300],[-4500,560,-3900],[-3900,760,-4500],[-3300,960,-3900]],['run']);
+  assert.ok(spire.every(n=>n>=5),`spire hops: ${spire.join(',')}`);
+});
+
+test('every animation the core can select produces a usable pose',()=>{
+  assert.equal(animations.length,209);
+  for(let id=0;id<animations.length;id++) {
+    const animName=animationName(id);
+    assert.match(animName,/^[A-Z][A-Z0-9_]*$/);
+    const [,start,end]=animations[id];
+    assert.ok(end>start&&start>=0,`${animName} loops ${start}..${end}`);
+    assert.equal(animationPhase(id,start),0);
+    assert.ok(animationPhase(id,end)<=1);
+    for(const phase of [0,.17,.4,.63,.9,1])
+      for(const air of [false,true])
+        for(const speed of [-24,0,32]) {
+          const p=poseFor({animName,actionName:'ACT_TEST',phase,speed,air,time:phase*7});
+          for(const limb of ['lh','rh','lf','rf'])
+            for(const value of p[limb])
+              assert.ok(Number.isFinite(value)&&Math.abs(value)<240,`${animName} ${limb} ${value}`);
+          for(const key of ['pitch','roll','spin','lift','headPitch','headYaw','lfp','rfp'])
+            assert.ok(Number.isFinite(p[key]),`${animName} ${key}`);
+          assert.ok(p.rate>0&&p.rate<=60,`${animName} rate ${p.rate}`);
+          assert.ok(p.squash>.4&&p.squash<1.6,`${animName} squash ${p.squash}`);
+        }
+  }
+});
+
+test('poses stay attached to the action the core reports',()=>{
+  const ledge=poseFor({animName:'IDLE_ON_LEDGE',actionName:'ACT_LEDGE_GRAB',phase:0,speed:0,air:false,time:0});
+  assert.ok(ledge.lift<-100&&ledge.lh[1]>0,'a ledge grab hangs below the lip it holds');
+  for(const [animName,actionName] of [['HANG_ON_CEILING','ACT_START_HANGING'],
+      ['HANDSTAND_LEFT','ACT_HANGING'],['MOVE_ON_WIRE_NET_LEFT','ACT_HANG_MOVING']]) {
+    const hang=poseFor({animName,actionName,phase:.25,speed:0,air:false,time:0});
+    assert.ok(hang.lh[1]>60&&hang.rh[1]>60,`${actionName} must reach both hands overhead`);
+  }
+  const wall=poseFor({animName:'SINGLE_JUMP',actionName:'ACT_AIR_HIT_WALL',phase:.2,speed:20,air:true,time:0});
+  assert.ok(wall.lh[2]>30&&wall.rh[2]>30,'wall contact plants both hands forward');
+  const punch=poseFor({animName:'FIRST_PUNCH',actionName:'ACT_PUNCHING',phase:.5,speed:0,air:false,time:0});
+  assert.ok(punch.rh[2]>60&&punch.lh[2]<0,'a punch drives one hand out and pulls the other back');
+  const spin=poseFor({animName:'TRIPLE_JUMP',actionName:'ACT_TRIPLE_JUMP',phase:1,speed:32,air:true,time:0});
+  assert.ok(Math.abs(spin.pitch-Math.PI*2)<1e-9,'a triple jump is one whole somersault');
 });

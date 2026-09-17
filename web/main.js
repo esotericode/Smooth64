@@ -1,4 +1,5 @@
 import {createWorld,zones} from './world.js';
+import {animationName} from './animations.js';
 import {loadCore,FixedClock} from './engine.js';
 import {Input} from './input.js';
 import {PlaygroundRenderer} from './renderer.js';
@@ -67,6 +68,7 @@ function renderHud() {
   const name=actionName().replace(/^ACT_/,'').toLowerCase().replaceAll('_',' ');
   $('action-name').textContent=name[0].toUpperCase()+name.slice(1);
   $('action-code').textContent=`0x${current.action.toString(16).toUpperCase().padStart(8,'0')}`;
+  $('animation-name').textContent=`${animationName(current.animation).toLowerCase().replaceAll('_',' ')} · ${current.frame}`;
   $('speed').textContent=current.speed.toFixed(2);
   $('speed-bar').style.width=`${Math.min(100,Math.abs(current.speed)/64*100)}%`;
   $('height').textContent=Math.round(current.position[1]-current.floor);

@@ -42,7 +42,12 @@ This first API is global and not thread-safe. It supports one world and one char
 - `engine.js`: WASM ABI and fixed-step accumulator; also used directly in Node verification.
 - `world.js`: authored integer triangle geometry, colored render surfaces, destination points.
 - `input.js`: keyboard, touch, standard gamepad, camera input. Core A/B/Z edge detection remains inside C.
-- `renderer.js`: Three.js, capsule, lighting, follow/orbit camera, camera obstruction ray, optional wireframe/trail.
+- `renderer.js`: Three.js, world meshes, lighting, follow/orbit camera, camera obstruction ray, optional wireframe/trail.
+- `animations.js`: generated animation names and loop ranges, plus the loop phase for a frame. `tools/export_animations.py` regenerates it from the pinned header and `core/kinematics.inc.h`.
+- `poses.js`: pose targets per animation, with no Three.js dependency, so Node tests can check every animation the core can select.
+- `character.js`: the explorer's rig — capsule body, head, orb hands and feet — and the frame-rate-independent blend toward the current pose target.
 - `main.js`: pause/reset/step and HUD, simulation scheduling, recovery.
+
+The rig reads only the published state: `animation`, `animation_frame`, the action, forward speed and height above the floor. Nothing it does is written back.
 
 Normal motion interpolates between the last two core positions. Pausing and stepping show the current state directly. Render interpolation, camera smoothing, squash/tilt, trail, and soft shadow never feed back into collision. Long frame stalls discard wall time rather than executing a backlog of stale controller input. The demo server serves only `web/` and binds localhost by default.

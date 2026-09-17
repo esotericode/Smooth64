@@ -73,6 +73,9 @@ Drag the view: camera     R: reset       Controls button: full move guide
 Long jump: run, press Shift, then Space.
 Backflip: stand still, hold Shift, then Space.
 Double/triple jump: jump again just after landing; run for the third jump.
+Wall kick: jump into a wall, press Space again the moment you touch it.
+Ledge grab: fall against a lip just above you; Space climbs up, Shift lets go.
+Ceiling hang: jump into a hangable ceiling holding Space, then steer to shuffle.
 
 The game pauses when you switch windows. Press P to resume.
 Requires a browser with WebGL 2 and WebAssembly enabled.

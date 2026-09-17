@@ -19,7 +19,7 @@
   <section id="welcome" class="welcome">
     <span class="eyebrow"><span class="tiny-line"></span> A STUDY IN MOMENTUM</span>
     <h1>A little space.<br>A lot of <em>movement.</em></h1>
-    <p>Run, leap, slide, repeat. A familiar set of moves in a new playground, with a little orange explorer.</p>
+    <p>Run, leap, slide, climb, repeat. Eleven places to try a familiar set of moves, with a little orange explorer.</p>
     <button id="start" class="primary" disabled>Preparing playground… <span>↗</span></button>
     <div class="welcome-foot"><span class="key-cluster">W A S D</span> to move <span class="dot">·</span><kbd>SPACE</kbd> to jump</div>
     <span class="welcome-detail">Keyboard + gamepad <span>•</span> No ROM required</span>
@@ -35,7 +35,7 @@
   <div id="toast" role="status" class="toast" hidden></div>
 
   <section id="telemetry" class="telemetry" hidden aria-label="Live movement state">
-    <div class="action-readout"><span class="section-label">CURRENT ACTION</span><strong id="action-name">Idle</strong><code id="action-code">0x0C400201</code></div>
+    <div class="action-readout"><span class="section-label">CURRENT ACTION</span><strong id="action-name">Idle</strong><code id="action-code">0x0C400201</code><code id="animation-name" class="animation">idle head center · 0</code></div>
     <div class="speed-readout"><span class="section-label">FORWARD SPEED <small>u / tick</small></span><strong id="speed">0.00</strong><div class="speed-track"><span id="speed-bar"></span></div></div>
     <div class="small-readouts"><span>HEIGHT <b id="height">0</b></span><span>VERTICAL <b id="vertical">0.00</b></span><span>TICK <b id="tick">0</b></span></div>
     <canvas id="stick-display" width="100" height="100" aria-label="Live analog input"></canvas>
@@ -60,7 +60,7 @@
     <p>Speed comes from the stick. On keyboard, hold a direction to run or add Alt for a gentle walk.</p>
     <div class="controls-grid">
       <div><h3>The basics</h3><dl><dt>Move</dt><dd>WASD / arrows</dd><dt>Jump / A</dt><dd>Space</dd><dt>Attack / B</dt><dd>J or X</dd><dt>Crouch / Z</dt><dd>Shift or Z</dd><dt>Orbit camera</dt><dd>Drag / Q E</dd><dt>Zoom</dt><dd>Mouse wheel</dd></dl></div>
-      <div><h3>Put it together</h3><dl class="moves"><dt>Double / triple jump</dt><dd>Jump again just after landing; keep running for the third.</dd><dt>Long jump</dt><dd>Run → crouch → jump.</dd><dt>Backflip</dt><dd>Stand still → hold crouch → jump.</dd><dt>Side somersault</dt><dd>Run → reverse direction → jump during the turn.</dd><dt>Wall kick</dt><dd>Jump into a wall → press jump again on impact.</dd><dt>Dive / ground pound</dt><dd>B while moving fast in the air / Z while airborne. At low speed, B gives a jump kick.</dd></dl></div>
+      <div><h3>Put it together</h3><dl class="moves"><dt>Double / triple jump</dt><dd>Jump again just after landing; keep running for the third.</dd><dt>Long jump</dt><dd>Run → crouch → jump.</dd><dt>Backflip</dt><dd>Stand still → hold crouch → jump.</dd><dt>Side somersault</dt><dd>Run → reverse direction → jump during the turn.</dd><dt>Wall kick</dt><dd>Jump into a wall → press jump again on impact.</dd><dt>Dive / ground pound</dt><dd>B while moving fast in the air / Z while airborne. At low speed, B gives a jump kick.</dd><dt>Ledge grab</dt><dd>Fall against a lip just above you to catch it. Jump to climb up, crouch to let go.</dd><dt>Hang</dt><dd>Jump into a hangable ceiling with A held, then move to shuffle along it.</dd></dl></div>
     </div>
     <p class="gamepad-note">Gamepad: left stick moves, right stick orbits, A jumps, X/B attacks, either trigger crouches. Touch: left pad + A/B/Z.</p>
     <details><summary>About the movement core</summary><p>Original US movement actions and math from n64decomp via libsm64, running in C at 30 ticks per second. The collision adapter and host differ from the N64 game; complete 1:1 equivalence is not yet verified. No ROM or original visual/audio assets are used. See the repository’s fidelity notes for known limits.</p></details>
