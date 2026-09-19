@@ -4,17 +4,19 @@ import {poseFor} from './pose.js';
 export class ExplorerRig extends T.Group {
   constructor() {
     super();this.pivot=new T.Group();this.add(this.pivot);
+    this.torso=new T.Group();this.pivot.add(this.torso);
     const orange=new T.MeshStandardMaterial({color:'#eb612f',roughness:.42});
     const cream=new T.MeshStandardMaterial({color:'#fff1ce',roughness:.55});
     const dark=new T.MeshStandardMaterial({color:'#213830',roughness:.48});
-    const mesh=(geometry,material,parent=this.pivot)=>{
+    const mesh=(geometry,material,parent=this.torso)=>{
       const m=new T.Mesh(geometry,material);m.castShadow=true;parent.add(m);return m;
     };
     mesh(new T.CapsuleGeometry(32,68,8,20),orange);
-    const visor=mesh(new T.SphereGeometry(28,16,12),dark);
-    visor.scale.set(1,.52,.4);visor.position.set(0,28,28);
+    this.head=new T.Group();this.head.position.y=26;this.torso.add(this.head);
+    const visor=mesh(new T.SphereGeometry(28,16,12),dark,this.head);
+    visor.scale.set(1,.52,.4);visor.position.set(0,2,28);
     this.eyes=[-10,10].map(x=>{
-      const eye=mesh(new T.SphereGeometry(3.6,8,8),cream);eye.position.set(x,29,39);return eye;
+      const eye=mesh(new T.SphereGeometry(3.6,8,8),cream,this.head);eye.position.set(x,3,39);return eye;
     });
     const stripe=mesh(new T.TorusGeometry(32.2,2,6,32),cream);
     stripe.rotation.x=Math.PI/2;stripe.position.y=-25;
@@ -37,7 +39,8 @@ export class ExplorerRig extends T.Group {
   animate(previous,current,alpha,previousName,currentName) {
     const a=poseFor(previous,previousName),b=poseFor(current,currentName);
     const vector=(object,key,from,to)=>object[key].set(...from.map((n,i)=>n+(to[i]-n)*alpha));
-    vector(this.pivot,'position',a.root,b.root);vector(this.pivot,'scale',a.scale,b.scale);
+    vector(this.pivot,'position',a.root,b.root);vector(this.torso,'scale',a.scale,b.scale);
+    this.head.rotation.set(...a.head.map((n,i)=>n+(b.head[i]-n)*alpha));
     this.qa.setFromEuler(this.euler.set(...a.rotation));this.qb.setFromEuler(this.euler.set(...b.rotation));
     this.pivot.quaternion.slerpQuaternions(this.qa,this.qb,alpha);
     for(let i=0;i<2;i++) {
