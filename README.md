@@ -20,7 +20,7 @@ A ROM-free movement playground built around the actual Super Mario 64 US action 
 
 The explorer now has orb gloves and little shoes, with procedural running, punching, kicking, flipping, diving, sliding, landing, hanging, and climbing poses. Ledge hangs place the body below the platform and keep the gloves planted at the lip. A camera-relative arrow shows which way to push to climb.
 
-The six original areas are joined by **Ledge garden**, **Wall-kick tower**, and **Skyline circuit**. Find **12 gold sparks** across the new routes; progress survives respawns until you reset the sparks or reload. Destination buttons jump directly to each area. The movement core and its compiled WASM are unchanged from the first edition.
+The six original areas are joined by **Ledge garden**, **Wall-kick tower**, **Skyline circuit**, and **Canopy walk**. Find **15 gold sparks** across the new routes; progress survives respawns until you reset the sparks or reload. Destination buttons jump directly to each area. The movement core and its compiled WASM are unchanged from the first edition. This release integrates the parallel animation/rendering work into a compact, connected course; see [merge decisions](docs/MERGE_NOTES.md).
 
 [Second-edition release notes](docs/releases/v0.2.0.md)
 
