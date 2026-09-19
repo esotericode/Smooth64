@@ -22,9 +22,9 @@ export class PlaygroundRenderer {
     const sun=new T.DirectionalLight('#fff4d8',3.1);
     sun.position.set(-2800,6500,3600);sun.castShadow=true;
     sun.shadow.mapSize.set(2048,2048);
-    Object.assign(sun.shadow.camera,{left:-8200,right:8200,top:8500,bottom:-8200,near:100,far:21000});
+    Object.assign(sun.shadow.camera,{left:-3400,right:3400,top:3400,bottom:-3400,near:100,far:13000});
     sun.shadow.normalBias=3;sun.shadow.bias=-.0002;
-    this.scene.add(sun);
+    this.sun=sun;this.scene.add(sun);this.scene.add(sun.target);
     this.meshes=[];
     for(const shape of world.shapes) {
       const positions=[],colors=[];
@@ -60,7 +60,8 @@ export class PlaygroundRenderer {
     this.groundText('07  /  LEDGE GARDEN',-5000,4,1900,1700);
     this.groundText('08  /  WALL-KICK TOWER',-2200,4,-4300,1800);
     this.groundText('09  /  SKYLINE CIRCUIT',1500,4,-3800,1800);
-    for(const [x,z,w,d] of [[-5000,-450,2300,6400],[0,-5350,7500,3000]]) {
+    this.groundText('10  /  CANOPY WALK',2200,4,3670,1600);
+    for(const [x,z,w,d] of [[-5000,300,2300,3900],[0,-5350,7500,3000],[2200,4800,1900,1900]]) {
       const border=new T.LineLoop(new T.BufferGeometry().setFromPoints([
         new T.Vector3(x-w/2,3,z-d/2),new T.Vector3(x+w/2,3,z-d/2),
         new T.Vector3(x+w/2,3,z+d/2),new T.Vector3(x-w/2,3,z+d/2)
@@ -137,6 +138,9 @@ export class PlaygroundRenderer {
     this.shadow.position.set(p[0],current.floor+3,p[2]);
     this.shadow.visible=current.floor>-2000&&!actionName.includes('LEDGE');
     this.shadow.material.opacity=Math.max(.05,.28-(p[1]-current.floor)/2400);
+    // Retain the parallel branch's local shadow coverage as the player travels.
+    this.sun.position.set(p[0]-2800,p[1]+6500,p[2]+3600);
+    this.sun.target.position.set(...p);this.sun.target.updateMatrixWorld();
     if(!this.intro) {
       const desiredTarget=this.character.worldCenter.clone().add(new T.Vector3(0,20,0));
       this.target.lerp(desiredTarget,1-Math.exp(-dt*16));
