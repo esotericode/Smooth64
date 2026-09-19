@@ -8,6 +8,7 @@ The target is the **US version at 30 simulation ticks per second**. Smooth64 use
 - The original 16-bit angle convention and sine/atan lookup tables, float32 state, and four quarter-step collision movements per simulation tick.
 - Original raw-stick per-axis deadzone (−7…7), ±6 adjustment, 64-unit circular clamp, and nonlinear intended magnitude.
 - Original animation start/loop flags, frame counts, and root XYZ values consumed by physics. Skeletal rotation tracks are omitted; nothing renders the original character.
+- Which animation the action code selected, and the frame it is on, decide the drawn pose. Cycle timing therefore inherits the original's speed-scaled animation acceleration instead of a display-time cycle of the frontend's own.
 - Simulation-owned animation progression: it happens once per tick, in the same post-action position as the upstream rendering animation update.
 - No generic capsule-controller replacement, physics-engine gravity, jump buffering beyond the input edge latch, or manually retuned acceleration.
 
@@ -23,6 +24,8 @@ The capsule is a visual placeholder. It does **not** replace SM64's action-depen
 | Animation dependency | Timing and root translation tables are extracted from public decomp C source. Rendering has no skeletal data. These numerical tables are still a dependency of some moves. |
 | Input | Keyboard and modern analog sticks map to raw N64 axis values; physical gate shape/calibration is not identical to an original N64 controller. Short keyboard/touch button taps are latched for one tick. |
 | Camera | Original orbit/follow camera, not Lakitu. It changes intended direction through the usual camera-yaw input. |
+| Character presentation | The explorer's orb hands and feet are original art posed by `web/pose.js` and `web/poses.js` from the animation identity and frame the core reports. They are not the original skeletal tracks, and no pose is claimed to match a frame of the original model. Of the model-space angles the original applies on top of `faceAngle`, only the side somersault's half turn is reproduced; walking pitch on slopes, dive and slide-kick pitch, twirl and steep-jump yaw are approximated or omitted, because the public state does not carry them. |
+| Ledge grab drawing | During `ACT_LEDGE_GRAB` the core parks the position on the ledge's own floor, as upstream does. The frontend draws the body hanging below that lip; the offset is presentation, and collision still uses the core's position. |
 | Host/world | One character and static triangle surfaces only. No moving platforms, poles, object grabbing, enemies, water volumes, cap pickups, wind setup, or level scripts are exposed by this host. Source files contain related actions, but that is not a claim those gameplay systems are usable here. |
 | Demo recovery | Falling below −1500 units, an invalid floor, or death resets to the chosen destination. Reset is an explicit demo convenience outside the movement rules. |
 | Verification | Native and WASM are compared with each other. There is no emulator, ROM, console capture, or independent reference replay oracle in the test suite. |
