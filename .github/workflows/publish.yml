@@ -24,6 +24,8 @@ jobs:
       - name: Verify the source and shipped movement core
         run: |
           python3 tools/check_vendor.py
+          python3 tools/export_animations.py
+          git diff --exit-code web/animations.js
           python3 tools/build.py native
           python3 -m unittest discover -s tests -v
           node --test tests/*.test.mjs
