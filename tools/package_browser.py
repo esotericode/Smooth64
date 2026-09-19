@@ -73,6 +73,13 @@ Drag the view: camera     R: reset       Controls button: full move guide
 Long jump: run, press Shift, then Space.
 Backflip: stand still, hold Shift, then Space.
 Double/triple jump: jump again just after landing; run for the third jump.
+Wall kick: jump into a wall, press Space again the moment you touch it.
+Ledge grab: catch a lip while falling; push toward it to climb, Space climbs quickly.
+Pull away from the lip or press Shift to let go. The on-screen arrow follows the camera.
+Ceiling hang: jump into a hangable ceiling holding Space, then steer to shuffle.
+
+Areas 07-10 are the new trails: ledges, wall kicks, skyline jumps, and a canopy.
+Find all 15 gold sparks. Respawning keeps them; Reset sparks starts a fresh hunt.
 
 The game pauses when you switch windows. Press P to resume.
 Requires a browser with WebGL 2 and WebAssembly enabled.
