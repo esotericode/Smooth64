@@ -1,9 +1,6 @@
 name: Restore source and publish easy browser download
 
 on:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/restore-and-package.yml', 'tools/package_browser.py']
   workflow_dispatch:
 
 permissions:
