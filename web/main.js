@@ -1,4 +1,5 @@
 import {createWorld,zones} from './world.js';
+import {animationName} from './animations.js';
 import {loadCore,FixedClock} from './engine.js';
 import {Input} from './input.js';
 import {PlaygroundRenderer} from './renderer.js';
@@ -49,7 +50,7 @@ function tick() {
   const reached=progress.collect(current,actionName());
   if(reached.length) {
     const route=reached.at(-1).route,count=progress.route(route);
-    toast(progress.found.size===progress.sparks.length?'All 12 sparks found. Beautifully done!':
+    toast(progress.found.size===progress.sparks.length?`All ${progress.sparks.length} sparks found. Beautifully done!`:
       `${route} · ${count.found} / ${count.total} sparks${count.found===count.total?' · route complete!':''}`);
   }
   if(current.position[1]<-1500 || current.health<256 || current.floor<-10000) {
@@ -75,6 +76,7 @@ function renderHud() {
   const name=actionName().replace(/^ACT_/,'').toLowerCase().replaceAll('_',' ');
   $('action-name').textContent=name[0].toUpperCase()+name.slice(1);
   $('action-code').textContent=`0x${current.action.toString(16).toUpperCase().padStart(8,'0')}`;
+  $('animation-name').textContent=`${animationName(current.animation).toLowerCase().replaceAll('_',' ')} · ${current.frame}`;
   $('speed').textContent=current.speed.toFixed(2);
   $('speed-bar').style.width=`${Math.min(100,Math.abs(current.speed)/64*100)}%`;
   $('height').textContent=Math.round(current.position[1]-current.floor);
@@ -100,7 +102,7 @@ function frame(now) {
     const delta=input.cameraDelta(dt);
     renderer.yaw+=delta.yaw;
     renderer.pitch=Math.max(.12,Math.min(1.25,renderer.pitch+delta.pitch));
-    renderer.distance=Math.max(350,Math.min(2100,renderer.distance+delta.zoom));
+    renderer.distance=Math.max(350,Math.min(3200,renderer.distance+delta.zoom));
     if(!paused)alpha=clock.advance(dt*(slow?.25:1),tick);
   }
   renderer.draw(previous,current,alpha,dt,actionName(),actions[previous.action],progress.found);
@@ -144,6 +146,10 @@ try {
   input=new Input(canvas,command);
   current=core.reset(zones[0].position,zones[0].yaw);previous=current;
   zones.forEach((zone,index)=>{
+    if(zone.section) {
+      const label=document.createElement('span');
+      label.className='zone-section';label.textContent=zone.section;$('zone-list').append(label);
+    }
     const button=document.createElement('button');button.dataset.zone=index;
     button.innerHTML=`<b>${String(index+1).padStart(2,'0')}</b><span>${zone.name}</span><small></small>`;
     button.addEventListener('click',()=>reset(index));$('zone-list').append(button);
