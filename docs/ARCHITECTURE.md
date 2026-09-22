@@ -10,6 +10,7 @@ The host compiles only a subset of libsm64. Its ROM loaders, Mario model/geometr
 4. Run `bhv_mario_update`, which executes the original action groups and collision steps.
 5. Advance the action's animation clock once, without rendering a model.
 6. Publish an 80-byte, fixed-width snapshot. The browser copies the snapshot; it never mutates internal state.
+7. `s64_heal(amount)` is the one gameplay hook. It adds to the character's heal counter, as n64decomp's `interact_coin` does (`4 * coinValue`; 4 units = one wedge). The upstream `update_mario_health` applies it over the following ticks. Objects are not hosted, so the frontend reports coin pickups.
 
 `core/silent_host.c` supplies no-op sound callbacks. `core/kinematics.inc.h` supplies only animation flags/timing and the first three translation channels that physics reads. `tools/import_kinematics.py` regenerates this numerical data from the pinned public source. There is no ROM parser.
 
@@ -40,12 +41,15 @@ This first API is global and not thread-safe. It supports one world and one char
 ## Browser host
 
 - `engine.js`: WASM ABI and fixed-step accumulator; also used directly in Node verification.
-- `world.js`: authored integer triangle geometry, colored render surfaces, destination points.
+- `world.js`: the playground's authored integer triangle geometry, colored render surfaces, destination points.
+- `caldera.js`: Cinder Caldera's geometry, built from integer slabs, columns, blades, annular sectors, and ramps. It also defines surface types (lava, hangable grates, very slippery chute), pickups, checkpoints, and the theme. `caldera-scene.js` adds render-only dressing: sky, embers, lavafalls, grate bars, torches, and titles. `decor.js` holds the playground's floor markings.
+- `level.js`: level bookkeeping, with no three.js or DOM. It handles coins, shards, stars, checkpoint lighting and respawn, the bonus-star reveal, and the tick-counted timer.
+- `effects.js`: pooled particles (dust, sparks, fire, pickup glitter) triggered by action transitions between consecutive snapshots.
 - `input.js`: keyboard, touch, standard gamepad, camera input. Core A/B/Z edge detection remains inside C.
-- `renderer.js`: Three.js, lighting, follow/orbit camera, camera obstruction ray, optional wireframe/trail, and spark display.
-- `character.js` / `pose.js`: original capsule-and-orb rig and pure procedural pose sampling. Hands, feet, body, and eyes interpolate between simulation snapshots. The camera follows the visible body, including below a ledge. Poses use the action name, animation clock, velocity, and tick; they never write back to the core. They are custom readable illustrations of actions, not the original game's skeletal animations.
+- `renderer.js`: Three.js, per-world themes and loading, an animated lava shader, and a lava underglow baked into vertex colors. Also the follow/orbit camera, whose obstruction rays rise over walls before pulling in; pickups; optional wireframe/trail; and a skippable intro shot.
+- `character.js` / `pose.js`: original capsule-and-orb rig and pure procedural pose sampling. On a live render, a change of action or animation crossfades from the displayed pose over 0.12 s of display time. Direct sampling, which the tests use, stays exact. Hands, feet, body, and eyes interpolate between simulation snapshots. The camera follows the visible body, including below a ledge. Poses use the action name, animation clock, velocity, and tick; they never write back to the core. They are custom readable illustrations of actions, not the original game's skeletal animations.
 - `animations.js` / `tools/export_animations.py`: names and loop bounds generated from the vendored enum and `kinematics.inc.h`, checked in CI. `poses.js` supplies the parallel branch's secondary animation vocabulary; `pose.js` samples it at simulation time and supplies the ledge, locomotion, landing, and attack poses.
 - `progress.js`: session-only spark collection, separate from physics. Uses the visible body center, so a ledge anchor alone cannot collect a spark above the platform.
-- `main.js`: pause/reset/step and HUD, simulation scheduling, recovery.
+- `main.js`: world switching, pause/reset/step, HUDs, simulation scheduling, recovery, level respawns, and coin heals.
 
 Normal motion interpolates between the last two core positions. Pausing and stepping show the current state directly. Render interpolation, camera smoothing, squash/tilt, trail, and soft shadow never feed back into collision. Long frame stalls discard wall time rather than executing a backlog of stale controller input. The demo server serves only `web/` and binds localhost by default.

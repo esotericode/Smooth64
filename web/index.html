@@ -12,21 +12,25 @@
   <div class="vignette"></div>
   <header>
     <a class="brand" href="./" aria-label="Smooth64 home"><span class="brand-mark">s</span>smooth<span class="brand-number">64</span></a>
-    <span class="edition">MOVEMENT PLAYGROUND <i> / </i> 002</span>
+    <span class="edition" id="edition">MOVEMENT PLAYGROUND <i> / </i> 003</span>
     <div class="header-actions"><span id="status" class="status"><i></i>Loading core</span><button id="help-button" aria-label="Open controls">Controls <kbd>?</kbd></button></div>
   </header>
 
   <section id="welcome" class="welcome">
     <span class="eyebrow"><span class="tiny-line"></span> A STUDY IN MOMENTUM</span>
     <h1>A little space.<br>A lot of <em>movement.</em></h1>
-    <p>Run, leap, grab, repeat. An orange explorer, ten places to play, and fifteen sparks waiting along the new trails.</p>
-    <button id="start" class="primary" disabled>Preparing playground… <span>↗</span></button>
+    <p>Run, leap, grab, repeat. Climb a volcanic spire for the Ember Star, or take the orange explorer to the playground's ten experiments.</p>
+    <button id="start-level" class="primary level-cta" disabled><span class="cta-copy"><b>Cinder Caldera</b><small>A full level · 2 stars · 8 shards</small></span> <span>↗</span></button>
+    <button id="start" class="secondary" disabled>Preparing playground… <span>↗</span></button>
     <div class="welcome-foot"><span class="key-cluster">W A S D</span> to move <span class="dot">·</span><kbd>SPACE</kbd> to jump</div>
     <span class="welcome-detail">Keyboard + gamepad <span>•</span> No ROM required</span>
   </section>
 
   <aside id="zones" class="zones" hidden>
-    <div class="section-label">EXPLORE THE PLAYGROUND <button id="zones-toggle" aria-label="Collapse destinations">−</button></div>
+    <div class="level-tabs" role="tablist" aria-label="Choose a world">
+      <button id="tab-caldera" role="tab" data-mode="caldera">Cinder Caldera</button><button id="tab-playground" role="tab" data-mode="playground">Playground</button>
+    </div>
+    <div class="section-label"><span id="zones-title">EXPLORE THE PLAYGROUND</span> <button id="zones-toggle" aria-label="Collapse destinations">−</button></div>
     <div id="zone-list"></div>
   </aside>
 
@@ -35,6 +39,23 @@
     <span class="section-label">THE EXTRA MILE</span><strong><span id="spark-count">0 / 15</span> <small>sparks</small></strong>
     <p>Find the gold sparks in areas 07–10.</p><button id="reset-sparks">Reset sparks ↺</button>
   </aside>
+  <aside id="objectives" class="challenge objectives" hidden aria-label="Level objectives">
+    <span class="section-label">CINDER CALDERA</span>
+    <ul>
+      <li id="goal-star"><i>★</i><span><b>Ember Star</b>Reach the summit of the Spire.</span></li>
+      <li id="goal-shards"><i>♦</i><span><b>Ember Shards <em id="shard-total">0 / 8</em></b>Each hides behind an optional challenge.</span></li>
+      <li id="goal-bonus"><i>★</i><span><b>Crimson Star</b>Eight shards light it on the lava altar.</span></li>
+    </ul>
+    <p>Coins heal one wedge. Lava burns three.</p><button id="restart-level">Restart level ↺</button>
+  </aside>
+  <div id="level-hud" class="level-hud" hidden aria-label="Level status">
+    <canvas id="power-meter" width="112" height="112" aria-label="Health"></canvas>
+    <span class="hud-item" title="Coins"><i class="coin-icon"></i><b id="coin-count">0</b></span>
+    <span class="hud-item" title="Ember Shards"><i class="shard-icon">♦</i><b id="shard-count">0</b><small>/8</small></span>
+    <span class="hud-item" title="Stars"><i class="star-icon">★</i><b id="star-count">0</b><small>/2</small></span>
+    <span class="hud-item hud-time" title="Time"><b id="level-time">0:00.0</b></span>
+  </div>
+  <div id="fade" class="fade" hidden><span id="fade-text">Too bad!</span></div>
   <div id="move-cue" class="move-cue" hidden></div>
   <div id="paused" class="pause-banner" hidden>PAUSED <span>Press P to resume</span></div>
   <div id="toast" role="status" class="toast" hidden></div>
@@ -59,6 +80,13 @@
 
   <div class="touch-ui"><div id="touch-stick" aria-label="Touch movement stick"><span></span></div><div class="touch-actions"><button data-touch="4">Z</button><button data-touch="2">B</button><button data-touch="1" class="jump-touch">A</button></div></div>
 
+  <dialog id="victory" class="victory">
+    <span class="eyebrow" id="victory-eyebrow">STAR GET</span><h2 id="victory-title">Ember Star claimed.</h2>
+    <p id="victory-copy">The summit is yours.</p>
+    <dl class="victory-stats"><dt>Time</dt><dd id="victory-time">0:00.0</dd><dt>Coins</dt><dd id="victory-coins">0</dd><dt>Shards</dt><dd id="victory-shards">0 / 8</dd><dt>Falls</dt><dd id="victory-deaths">0</dd></dl>
+    <div class="victory-actions"><button id="victory-continue" class="primary">Keep exploring <span>↗</span></button><button id="victory-restart" class="secondary">Play again ↺</button></div>
+  </dialog>
+
   <dialog id="help">
     <button id="close-help" class="close" aria-label="Close controls">×</button>
     <span class="eyebrow">FIELD GUIDE</span><h2>Make your next move.</h2>
@@ -67,6 +95,7 @@
       <div><h3>The basics</h3><dl><dt>Move</dt><dd>WASD / arrows</dd><dt>Jump / A</dt><dd>Space</dd><dt>Attack / B</dt><dd>J or X</dd><dt>Crouch / Z</dt><dd>Shift or Z</dd><dt>Orbit camera</dt><dd>Drag / Q E</dd><dt>Zoom</dt><dd>Mouse wheel</dd></dl></div>
       <div><h3>Put it together</h3><dl class="moves"><dt>Double / triple jump</dt><dd>Jump again just after landing; keep running for the third.</dd><dt>Long jump</dt><dd>Run → crouch → jump.</dd><dt>Backflip</dt><dd>Stand still → hold crouch → jump.</dd><dt>Side somersault</dt><dd>Run → reverse direction → jump during the turn.</dd><dt>Wall kick</dt><dd>Jump into a wall → press jump again on impact.</dd><dt>Ledge grab / climb</dt><dd>Catch a lip while descending. Release the stick to hang. Push toward the ledge to climb, or tap A / Space to pull up quickly. Pull away or press Z / Shift to drop. Stick climbing starts after a brief pause; the on-screen arrow follows your camera.</dd><dt>Ceiling hang</dt><dd>Hold A / Space under the green hanging frame. Keep holding it as you move.</dd><dt>Dive / ground pound</dt><dd>B while moving fast in the air / Z while airborne. At low speed, B gives a jump kick.</dd></dl></div>
     </div>
+    <div class="level-guide"><h3>Cinder Caldera</h3><p>Claim the <b>Ember Star</b> on the Spire's summit. Lava burns three wedges of health and launches you; coins heal one. Touch a beacon to make it your checkpoint: <b>R</b> returns you there, and a fall at zero health does too. Eight red <b>Ember Shards</b> sit behind optional challenges. Find them all to light the <b>Crimson Star</b> on the lava altar below the landing.</p></div>
     <p class="gamepad-note">Gamepad: left stick moves, right stick orbits, A jumps, X/B attacks, either trigger crouches. Touch: left pad + A/B/Z.</p>
     <details><summary>About the movement core</summary><p>Original US movement actions and math from n64decomp via libsm64, running in C at 30 ticks per second. The collision adapter and host differ from the N64 game; complete 1:1 equivalence is not yet verified. No ROM or original visual/audio assets are used. See the repository’s fidelity notes for known limits.</p></details>
     <button id="help-done" class="primary">Got it <span>↗</span></button>

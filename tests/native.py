@@ -40,6 +40,10 @@ class Native:
     def raw(self):
         return C.string_at(self.lib.s64_state(), C.sizeof(State))
 
+    def heal(self, amount):
+        self.lib.s64_heal(amount)
+        return self.state()
+
     def tick(self, x=0, y=0, buttons=0, yaw=0):
         self.lib.s64_tick(x,y,buttons,yaw)
         return self.state()

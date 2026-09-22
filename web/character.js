@@ -1,6 +1,10 @@
 import * as T from './vendor/three.module.min.js';
 import {poseFor} from './pose.js';
 
+// How long a change of action/animation takes to settle into its new pose.
+// Display-time only: the core has already changed action on the tick.
+const CROSSFADE=0.12;
+
 export class ExplorerRig extends T.Group {
   constructor() {
     super();this.pivot=new T.Group();this.add(this.pivot);
@@ -35,9 +39,30 @@ export class ExplorerRig extends T.Group {
     });
     this.qa=new T.Quaternion();this.qb=new T.Quaternion();this.euler=new T.Euler();
     this.worldCenter=new T.Vector3();
+    this.fade=null;this.poseKey='';
   }
-  animate(previous,current,alpha,previousName,currentName) {
+  // Forget any in-progress blend, e.g. after a respawn teleport.
+  snap() {this.fade=null;this.poseKey='';}
+  // Record every animated channel, so a change of action can blend from it.
+  capture() {
+    return {pivot:this.pivot.position.clone(),quaternion:this.pivot.quaternion.clone(),scale:this.torso.scale.clone(),
+      head:this.head.rotation.clone(),hands:this.hands.map(h=>[h.position.clone(),h.scale.x]),
+      feet:this.feet.map(f=>[f.position.clone(),f.rotation.x]),eyes:this.eyes[0].scale.y};
+  }
+  animate(previous,current,alpha,previousName,currentName,dt) {
     const a=poseFor(previous,previousName),b=poseFor(current,currentName);
+    // Only a live render (with a frame time) blends between actions. Direct
+    // sampling stays exact, and pauses/steps freeze the blend where it is.
+    const key=`${currentName}:${current.animation}`,live=dt!==undefined;
+    const from=live&&this.poseKey&&key!==this.poseKey&&!currentName.includes('LEDGE_GRAB')?this.capture():null;
+    if(live) {
+      this.poseKey=key;
+      // A restart still advances this frame, so keys that change on
+      // consecutive ticks keep converging instead of holding the snapshot.
+      if(from)this.fade={from,t:0};
+      if(this.fade)this.fade.t+=dt/CROSSFADE;
+      if(this.fade&&this.fade.t>=1)this.fade=null;
+    }
     const vector=(object,key,from,to)=>object[key].set(...from.map((n,i)=>n+(to[i]-n)*alpha));
     vector(this.pivot,'position',a.root,b.root);vector(this.torso,'scale',a.scale,b.scale);
     this.head.rotation.set(...a.head.map((n,i)=>n+(b.head[i]-n)*alpha));
@@ -49,6 +74,20 @@ export class ExplorerRig extends T.Group {
       this.feet[i].rotation.x=a.footPitch[i]+(b.footPitch[i]-a.footPitch[i])*alpha;
       this.hands[i].scale.setScalar(a.handScale[i]+(b.handScale[i]-a.handScale[i])*alpha);
       this.eyes[i].scale.y=a.eyes+(b.eyes-a.eyes)*alpha;
+    }
+    if(this.fade) {
+      const f=this.fade.from,w=this.fade.t*this.fade.t*(3-2*this.fade.t);
+      this.pivot.position.lerpVectors(f.pivot,this.pivot.position,w);
+      this.qb.copy(this.pivot.quaternion);this.pivot.quaternion.slerpQuaternions(f.quaternion,this.qb,w);
+      this.torso.scale.lerpVectors(f.scale,this.torso.scale,w);
+      this.head.rotation.set(...['x','y','z'].map(k=>f.head[k]+(this.head.rotation[k]-f.head[k])*w));
+      for(let i=0;i<2;i++) {
+        this.hands[i].position.lerpVectors(f.hands[i][0],this.hands[i].position,w);
+        this.hands[i].scale.setScalar(f.hands[i][1]+(this.hands[i].scale.x-f.hands[i][1])*w);
+        this.feet[i].position.lerpVectors(f.feet[i][0],this.feet[i].position,w);
+        this.feet[i].rotation.x=f.feet[i][1]+(this.feet[i].rotation.x-f.feet[i][1])*w;
+        this.eyes[i].scale.y=f.eyes+(this.eyes[i].scale.y-f.eyes)*w;
+      }
     }
     this.updateMatrixWorld(true);
     this.pivot.getWorldPosition(this.worldCenter);

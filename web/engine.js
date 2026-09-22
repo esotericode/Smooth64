@@ -37,6 +37,8 @@ export async function loadCore(bytes) {
       return this.state();
     },
     floor(x,y,z) { return api.s64_floor_height(x,y,z); },
+    // Coins: 4 = one wedge, queued like the original coin interaction.
+    heal(amount) { api.s64_heal(amount); return this.state(); },
     stateBytes() { return new Uint8Array(memory.buffer,statePointer,80).slice(); },
     state() {
       const f=new Float32Array(memory.buffer,statePointer,20);

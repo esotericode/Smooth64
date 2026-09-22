@@ -62,7 +62,7 @@ def package():
 
 1. Extract this ZIP (right-click it, then Extract All on Windows).
 2. Double-click Smooth64-Play.html.
-3. Click Enter playground.
+3. Click Cinder Caldera (the level) or Movement playground.
 
 If asked which app to use, choose Microsoft Edge, Chrome, or Firefox.
 No installation, account, internet connection, Python, terminal, or ROM needed.
@@ -78,8 +78,13 @@ Ledge grab: catch a lip while falling; push toward it to climb, Space climbs qui
 Pull away from the lip or press Shift to let go. The on-screen arrow follows the camera.
 Ceiling hang: jump into a hangable ceiling holding Space, then steer to shuffle.
 
-Areas 07-10 are the new trails: ledges, wall kicks, skyline jumps, and a canopy.
-Find all 15 gold sparks. Respawning keeps them; Reset sparks starts a fresh hunt.
+CINDER CALDERA: climb the volcanic Spire to the Ember Star. Lava burns three
+wedges of health; coins heal one. Touch beacons to set your checkpoint (R returns
+there). Eight red Ember Shards hide behind optional challenges; all eight light
+the Crimson Star on the lava altar.
+
+PLAYGROUND: areas 07-10 are the trails: ledges, wall kicks, skyline jumps, and a
+canopy. Find all 15 gold sparks.
 
 The game pauses when you switch windows. Press P to resume.
 Requires a browser with WebGL 2 and WebAssembly enabled.

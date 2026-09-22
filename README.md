@@ -7,7 +7,7 @@
 
 1. Download and extract the ZIP.
 2. Double-click **Smooth64-Play.html**.
-3. Click **Enter playground**.
+3. Click **Cinder Caldera** for the level, or **Movement playground** for the test areas.
 
 Works offline in Edge, Chrome, or Firefox. No installation, Python, terminal, compiler, or ROM required. **WASD** moves, **Space** jumps, **Shift** crouches, **J** attacks.
 
@@ -15,6 +15,31 @@ The original recovery ZIP is kept in this repository. The folders below contain 
 
 
 A ROM-free movement playground built around the actual Super Mario 64 US action code, with an original capsule character and an original test level.
+
+## Third edition — Cinder Caldera
+
+A complete, original level built for the movement core. You climb a volcanic crater to the **Ember Star** on top of the central Spire, and the route circles the crater:
+
+1. **Ashfall Landing:** the start.
+2. **Basalt Steps:** columns over lava; the gaps widen as the columns shrink.
+3. **The Forge:** a ledge-grab rampart and a backflip step.
+4. **The Chimney:** a 1,160-unit wall-kick shaft.
+5. **Chain Bridge:** hang traverses.
+6. **Obsidian Ridge:** narrow beams, blades, and a very slippery chute.
+7. **The Spire:** a spiral with a wall-kick corridor, a backflip step, and a jump for the summit rim.
+
+Lava is the core's own `SURFACE_BURNING`: three wedges of damage and a launch. Coins heal a wedge. **Eight Ember Shards** sit behind optional challenges: the broken gate, a lone column, the anvil roof, the flue, a grate spur, the belfry, the chute, and the Spire's perch. Collecting all eight lights the **Crimson Star** on a lava altar. Five checkpoint beacons, a power meter, a timer, and a star-get summary round it out.
+
+Every leg of the main route and every shard is proven reachable in `tests/caldera.test.mjs` by driving the real core with controller inputs. The tests also check that the anvil, belfry, and altar challenges can't be skipped with a plain jump.
+
+The character's animation also got a review pass:
+- Actions crossfade instead of snapping.
+- The side-somersault landing turns around smoothly.
+- The slide kick, ground-pound landing, rollouts, knockbacks, and letting go of the stick at walking speed now match what the core is doing.
+- Dust, sparks, and fire effects show takeoffs, landings, wall kicks, and lava boosts.
+- The camera looks down narrow shafts instead of pressing into the explorer.
+
+[Third-edition release notes](docs/releases/v0.3.0.md)
 
 ## Second edition — hands, feet, and a bigger playground
 
@@ -34,7 +59,7 @@ Clone this branch, then run:
 python3 tools/serve.py
 ```
 
-Open **http://localhost:8000** and select **Enter playground**. On Windows, `py tools/serve.py` also works.
+Open **http://localhost:8000** and select **Cinder Caldera** or **Movement playground**. On Windows, `py tools/serve.py` also works.
 
 Python 3 and a current browser with WebGL 2/WebAssembly are all you need. The compiled movement core and renderer are included. No npm install, compiler, ROM, CDN, or account is needed to play. Opening `index.html` directly as a `file:` URL will not work; use the local server. The `web/` directory is also a complete static build suitable for a normal HTTP server.
 
@@ -48,7 +73,7 @@ The playground contains a runway, walkable ramps, a steep slippery slope, a wall
 | Attack / B | J or X | X or B |
 | Crouch / Z | Shift or Z | Either trigger |
 | Camera | Drag or Q/E; wheel to zoom | Right stick |
-| Reset | R | On-screen button |
+| Reset (level: last checkpoint) | R | On-screen button |
 | Pause / resume | P or Escape | On-screen button |
 | Advance one tick | N | On-screen button |
 | Quarter speed | T | On-screen button |
@@ -74,7 +99,7 @@ The core's original timings apply; there is no added coyote time, automatic bunn
 ```text
 core/               Small C host and public API; movement timing/root-motion tables
 vendor/libsm64/     Pinned upstream C actions, math, collision adapter, and headers
-web/                Original level, procedural character rig, input, camera, and debug UI
+web/                Original levels (playground, Cinder Caldera), procedural character rig, input, camera, and UI
 tests/              Behavioral checks and native ↔ WASM frame-by-frame comparisons
 tools/              Build, serve, import, and provenance checks
 docs/               Fidelity, architecture, and verification notes
@@ -82,7 +107,7 @@ docs/               Fidelity, architecture, and verification notes
 
 The renderer uses Three.js only to draw. It does not provide character physics. Collision and visible geometry are generated from the same integer-coordinate triangle list. The C core advances at exactly **30 Hz**; the display interpolates positions independently. Animation clocks also advance at simulation rate even though no original character model is drawn.
 
-`core/smooth64.h` is the engine integration boundary. The same C code can be linked into a raylib/SDL/custom native host; WebAssembly is just the first frontend. This initial API is deliberately **single-world, single-character, static geometry**.
+`core/smooth64.h` is the engine integration boundary. Besides world loading and ticking, it has one gameplay hook: `s64_heal`, which queues health the way the original coin interaction does. The same C code can be linked into a raylib/SDL/custom native host; WebAssembly is just the first frontend. This initial API is deliberately **single-world, single-character, static geometry**.
 
 ## Build and verify
 
