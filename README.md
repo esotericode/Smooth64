@@ -16,7 +16,7 @@ The original recovery ZIP is kept in this repository. The folders below contain 
 
 A ROM-free platformer built around the Super Mario 64 US movement code, with an original explorer, a volcanic adventure, and a connected practice playground.
 
-## Game polish — one set of rules, a quieter screen
+## Version 0.3.1 — one set of rules, a quieter screen
 
 The default view shows **power and collectibles**. Open **Menu** (Escape, P, or gamepad Start) for objectives, checkpoint travel, world selection, and settings. **Developer tools** is off by default: turn it on for action/animation readouts, input display, frame stepping, slow motion, trails, and collision mesh. Movement hints and the on-screen timer have separate settings. Settings are remembered when browser storage is available.
 
@@ -25,6 +25,8 @@ Both worlds now use the same coins, healing, power meter, checkpoint beacons, pi
 Each world's collected items, timer, and checkpoints survive switching worlds and retries. Switching returns you to that world's checkpoint with full power. **Start this world over** resets only that world's progress; reloading resets both runs. Caldera checkpoints unlock as you reach them; all playground destinations are always available.
 
 Movement polish keeps gloves anchored through live ledge transitions and plants the running stance foot while the torso leans and bobs. Menus clear held/queued input, pause simulation and animation, and stop multi-tick catch-up immediately when a star is collected. Gamepad Start and touch cancellation follow the same pause/input rules.
+
+[Game polish release notes](docs/releases/v0.3.1.md)
 
 ## Third edition — Cinder Caldera
 
