@@ -51,7 +51,7 @@ class Pool {
 
 export class Effects {
   constructor(scene) {
-    this.soft=new Pool(scene,false);this.glow=new Pool(scene,true);this.seed=1;this.dust='#e9e6d2';
+    this.soft=new Pool(scene,false);this.glow=new Pool(scene,true);this.seed=1;this.dust='#e9e6d2';this.hazard=null;
   }
   random() {this.seed=(Math.imul(this.seed,1664525)+1013904223)>>>0;return this.seed/4294967296;}
   color(value) {const c=new T.Color(value);return [c.r,c.g,c.b];}
@@ -74,15 +74,17 @@ export class Effects {
         gravity,drag,color:this.color(color),end:this.color(end),alpha,size,grow,life:life*(.7+.6*this.random()),age:0});
     }
   }
+  // Flames, or with a hazard theme (e.g. frostbite water) its own colours.
   fire(position,count=2) {
+    const [flame,ember]=this.hazard?.fire??['#ffd36b','#e2380f'],[smoke,soot]=this.hazard?.smoke??['#4a3a38','#2a2226'];
     for(let i=0;i<count;i++) {
       const jitter=()=>(this.random()-.5)*36;
       this.glow.add({position:[position[0]+jitter(),position[1]+jitter()*.5,position[2]+jitter()],
         velocity:[jitter()*1.5,90+90*this.random(),jitter()*1.5],gravity:60,drag:.9,
-        color:this.color('#ffd36b'),end:this.color('#e2380f'),alpha:.9,size:44,grow:12,life:.38+.2*this.random(),age:0});
+        color:this.color(flame),end:this.color(ember),alpha:.9,size:44,grow:12,life:.38+.2*this.random(),age:0});
       if(this.random()<.45)this.soft.add({position:[position[0]+jitter(),position[1]+20,position[2]+jitter()],
         velocity:[jitter(),70+50*this.random(),jitter()],gravity:20,drag:.92,
-        color:this.color('#4a3a38'),end:this.color('#2a2226'),alpha:.45,size:40,grow:130,life:.9,age:0});
+        color:this.color(smoke),end:this.color(soot),alpha:.45,size:40,grow:130,life:.9,age:0});
     }
   }
   // Read one tick's transition from the core's snapshots.
@@ -103,8 +105,9 @@ export class Effects {
       } else if(impact>0) this.ring(feet,{count:6+Math.round(8*impact),speed:110+160*impact,size:38,grow:90+50*impact,life:.45});
     }
     if(name.includes('LAVA_BOOST')&&!prevName.includes('LAVA_BOOST')) {
-      this.burst([at[0],at[1]+30,at[2]],{count:26,speed:320,up:320,size:48,color:'#ffe08a',end:'#d9300e',life:.6,gravity:-300});
-      this.ring(feet,{count:14,speed:260,rise:120,size:60,grow:190,color:'#5c4640',end:'#2b2124',alpha:.55,life:1});
+      const [spark,heat]=this.hazard?.burst??['#ffe08a','#d9300e'],[cloud,shade]=this.hazard?.cloud??['#5c4640','#2b2124'];
+      this.burst([at[0],at[1]+30,at[2]],{count:26,speed:320,up:320,size:48,color:spark,end:heat,life:.6,gravity:-300});
+      this.ring(feet,{count:14,speed:260,rise:120,size:60,grow:190,color:cloud,end:shade,alpha:.55,life:1});
     }
     if(name==='ACT_LAVA_BOOST'&&isAir)this.fire([at[0],at[1]+36,at[2]],2);
     const skid=name.includes('BRAKING')||name.includes('TURNING_AROUND')||name.includes('SLIDE')&&!isAir&&Math.abs(cur.speed)>10;

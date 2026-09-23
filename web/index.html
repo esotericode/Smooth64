@@ -18,8 +18,9 @@
   <section id="welcome" class="welcome" aria-labelledby="welcome-title">
     <span class="eyebrow">A LITTLE EXPLORER. A BIG CLIMB.</span>
     <h1 id="welcome-title">Find your footing.<br>Reach for <em>the stars.</em></h1>
-    <p>Leap across the lava, climb the Spire, and uncover the secrets of Cinder Caldera.</p>
+    <p>Leap across the lava of Cinder Caldera, or climb the ice of Hoarfrost Heights.</p>
     <button id="start-level" class="primary" disabled><span><b>Play Cinder Caldera</b><small>2 stars to claim · 8 shards to discover</small></span><span aria-hidden="true">↗</span></button>
+    <button id="start-frost" class="primary frost" disabled><span><b>Play Hoarfrost Heights</b><small>New · part one: the climb to the Shoulder</small></span><span aria-hidden="true">↗</span></button>
     <button id="start" class="secondary" disabled>Visit the playground <span aria-hidden="true">→</span></button>
     <p class="welcome-foot"><kbd>WASD</kbd> move <span>·</span> <kbd>Space</kbd> jump</p>
     <span id="status" role="status">Preparing your adventure…</span>
@@ -61,17 +62,13 @@
     <section class="mission-card" aria-label="World progress">
       <div class="section-heading"><h3 id="mission-title">Cinder Caldera</h3><span id="menu-time">0:00.0</span></div>
       <p id="objective-summary"></p>
-      <ul id="objectives" class="objectives">
-        <li id="goal-star"><i aria-hidden="true">★</i><span><b>Ember Star</b>Reach the summit.</span></li>
-        <li id="goal-shards"><i aria-hidden="true">♦</i><span><b>Ember Shards <em id="shard-total">0 / 8</em></b>Explore the hidden challenges.</span></li>
-        <li id="goal-bonus"><i aria-hidden="true">★</i><span><b>Crimson Star</b>Find every shard, then visit the lava altar.</span></li>
-      </ul>
+      <ul id="objectives" class="objectives"></ul>
       <p class="progress-line"><span id="menu-coins"></span><span id="menu-deaths"></span></p>
     </section>
     <details id="destinations"><summary id="zones-title">Checkpoints</summary><div id="zone-list"></div></details>
     <section class="menu-section" aria-labelledby="worlds-title">
       <h3 id="worlds-title">Choose a world</h3>
-      <div class="world-list"><button data-mode="caldera" aria-pressed="true"><b>Cinder Caldera</b><small>The adventure</small></button><button data-mode="playground" aria-pressed="false"><b>Movement Playground</b><small>Practice every move</small></button></div>
+      <div class="world-list"><button data-mode="caldera" aria-pressed="true"><b>Cinder Caldera</b><small>The volcano</small></button><button data-mode="hoarfrost" aria-pressed="false"><b>Hoarfrost Heights</b><small>The ice climb</small></button><button data-mode="playground" aria-pressed="false"><b>Movement Playground</b><small>Practice every move</small></button></div>
       <p class="quiet">Your coins and checkpoints stay with each world until you start over or reload.</p>
     </section>
     <section class="menu-section" aria-labelledby="settings-title">
@@ -101,7 +98,7 @@
       <div><h3>The basics</h3><dl><dt>Move</dt><dd>WASD / arrows</dd><dt>Jump</dt><dd>Space / A</dd><dt>Attack</dt><dd>J or X / B</dd><dt>Crouch</dt><dd>Shift or Z</dd><dt>Orbit camera</dt><dd>Drag / Q E</dd><dt>Zoom</dt><dd>Mouse wheel</dd><dt>Pause / menu</dt><dd>Escape / P / Start</dd><dt>Checkpoint</dt><dd>R</dd></dl></div>
       <div><h3>Put it together</h3><dl class="moves"><dt>Double / triple jump</dt><dd>Jump again just after landing. Keep running for the third jump.</dd><dt>Long jump</dt><dd>Run, crouch, then jump.</dd><dt>Backflip</dt><dd>Stand still, hold crouch, then jump.</dd><dt>Side somersault</dt><dd>Reverse direction while running. Jump during the turn.</dd><dt>Wall kick</dt><dd>Jump into a wall, then tap jump again on impact.</dd><dt>Ledge climb</dt><dd>Catch a lip while falling. Push toward the ledge to climb, or tap jump to pull up quickly. Pull away or crouch to drop.</dd><dt>Ceiling hang</dt><dd>Jump under a hanging frame. Keep holding jump as you move.</dd><dt>Dive / ground pound</dt><dd>Attack while moving fast in the air to dive. Crouch in the air to ground pound.</dd></dl></div>
     </div>
-    <div class="level-guide"><h3>Power, coins & checkpoints</h3><p>Coins restore one wedge of power. Lava burns three wedges and launches you upward. Touch a beacon to set your checkpoint. If you fall or run out of power, you return there with your collected items intact. These rules work in both worlds.</p><h3>Cinder Caldera</h3><p>Claim the <b>Ember Star</b> on the Spire's summit. Find eight red <b>Ember Shards</b> to reveal the <b>Crimson Star</b> on the lava altar below the landing.</p></div>
+    <div class="level-guide"><h3>Power, coins & checkpoints</h3><p>Coins restore one wedge of power. Lava burns three wedges and launches you upward. Touch a beacon to set your checkpoint. If you fall or run out of power, you return there with your collected items intact. These rules work in both worlds.</p><h3>Cinder Caldera</h3><p>Claim the <b>Ember Star</b> on the Spire's summit. Find eight red <b>Ember Shards</b> to reveal the <b>Crimson Star</b> on the lava altar below the landing.</p><h3>Hoarfrost Heights</h3><p>Climb to the <b>Icefall Star</b> on the Shoulder of the Horn and find five blue <b>Frost Shards</b>. Blue ice will not hold you: you slide on it and cannot climb it, and a full run takes a long skid to stop. Let go of the stick as you land to stop dead. Deep snow slows your run; grey rock grips even when steep. Open water bites like lava. Fall into the clouds and you return to your beacon.</p></div>
     <p class="gamepad-note">Gamepad: left stick moves, right stick orbits, A jumps, X/B attacks, either trigger crouches, Start opens the menu. If a stick drifts, raise the stick dead zone in Settings. Touch: left pad + A/B/Z. Sound and music volume are in Settings too.</p>
     <details id="technical-guide" hidden><summary>About the movement core</summary><p>Original US movement actions and math from n64decomp via libsm64, running in C at 30 ticks per second. Collision and presentation differ from the N64 game; complete equivalence is not verified. No ROM or Nintendo visual/audio assets are used. See the repository's fidelity notes.</p></details>
     <button id="help-done" class="primary">Got it <span aria-hidden="true">↗</span></button>

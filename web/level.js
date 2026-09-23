@@ -65,7 +65,8 @@ export class LevelSession {
       const rule=PICKUPS[pickup.kind];
       if(!rule||Math.hypot(...pickup.position.map((v,i)=>v-center[i]))>=rule.reach)continue;
       this.found.add(pickup.id);
-      if(pickup.kind==='star'&&this.finishTicks===null)this.finishTicks=this.ticks;
+      // The clock stops at the world's goal star, or at any star if it names none.
+      if(pickup.kind==='star'&&this.finishTicks===null&&(!this.world.goal||pickup.id===this.world.goal))this.finishTicks=this.ticks;
       events.push({type:pickup.kind,pickup,...(rule.heal?{heal:rule.heal}:{})});
       if(pickup.kind==='shard'&&this.revealed.size&&!revealed.size) {
         events.push({type:'reveal'});

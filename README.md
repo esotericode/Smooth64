@@ -14,7 +14,20 @@ Works offline in Edge, Chrome, or Firefox. No installation, Python, terminal, co
 The original recovery ZIP is kept in this repository. The folders below contain the editable project source.
 
 
-A ROM-free platformer built around the Super Mario 64 US movement code, with an original explorer, a volcanic adventure, and a connected practice playground.
+A ROM-free platformer built around the Super Mario 64 US movement code, with an original explorer, a volcanic adventure, an ice climb (part one), and a connected practice playground.
+
+## In progress: Hoarfrost Heights, part one
+
+A new level is in the source, not yet in a release. It is much bigger than Cinder Caldera: about five times the footprint and three times the height once the summit is added. A high valley floats on a sea of cloud under the **Hoarfrost Horn**. Part one takes you from Frostmere Camp to the **Icefall Star** on the Horn's Shoulder:
+
+1. **Mirror Lake:** hop across floes over frostbite water. The water bites like lava, as in the original's snowy course. A tilted ice floe slides you straight into a jump, and an ice runway you cannot stop on ends in a long jump.
+2. **Pinewood Drifts:** terraces of deep snow that slow your run, and a jump and grab out of each. A fallen, iced-over pine spans a ravine, snapped in two.
+3. **The Glacier:** crevasses, a snow bridge, and an ice chute. You slide at over 90 units a tick and must jump before the lip to clear the Great Crevasse.
+4. **The Icefall:** a serac step, a 950-unit wall-kick chimney, then a grippy rock rib beside an ice chute that cannot be climbed.
+
+Blue ice will not hold you: you slide down any slope of it, a full run skids ~1,200 units, and landing a jump and letting go of the stick is how you stop dead. Deep snow caps your run; grey rock grips even at 45°. **Five Frost Shards** hide behind optional challenges: the watchtower, the Lone Floe, the Great Pine, a crevasse ledge, and a serac needle. Six beacons are checkpoints. Twilight, snowfall and an aurora overhead are drawn in real time.
+
+Part two, the upper Horn, is planned and not built: the Frozen Falls, a wind-scoured ridge, the summit's Aurora Star, a long slide home, three more shards, and the bonus Polar Star. [Design notes and the part two plan](docs/HOARFROST.md). Every leg of part one and every shard is proven reachable in `tests/hoarfrost.test.mjs` by driving the real core with controller inputs. Negative checks show where a specific move is required, and that the upper Horn stays sealed for now.
 
 ## Version 0.6.0 — original music
 
@@ -91,7 +104,7 @@ Clone this branch, then run:
 python3 tools/serve.py
 ```
 
-Open **http://localhost:8000** and select **Cinder Caldera** or **Movement playground**. On Windows, `py tools/serve.py` also works.
+Open **http://localhost:8000** and select **Cinder Caldera**, **Hoarfrost Heights**, or **Movement playground**. On Windows, `py tools/serve.py` also works.
 
 Python 3 and a current browser with WebGL 2/WebAssembly are all you need. The compiled movement core and renderer are included. No npm install, compiler, ROM, CDN, or account is needed to play. Opening `index.html` directly as a `file:` URL will not work; use the local server. The `web/` directory is also a complete static build suitable for a normal HTTP server.
 
@@ -132,7 +145,7 @@ The core's original timings apply; there is no added coyote time, automatic bunn
 ```text
 core/               Small C host and public API; movement timing/root-motion tables
 vendor/libsm64/     Pinned upstream C actions, math, collision adapter, and headers
-web/                Original levels (playground, Cinder Caldera), procedural character rig, input, camera, and UI
+web/                Original levels (playground, Cinder Caldera, Hoarfrost Heights), geometry kit, procedural character rig, input, camera, and UI
 tests/              Behavioral checks and native ↔ WASM frame-by-frame comparisons
 tools/              Build, serve, import, and provenance checks
 docs/               Fidelity, architecture, and verification notes
@@ -168,7 +181,7 @@ python3 tools/package_browser.py
 npm run test:browser
 ```
 
-The browser check writes review screenshots under `build/browser-checks/`. Set `BROWSER_EXECUTABLE_PATH` to use an existing Chromium executable. Playwright is only needed for this optional check; playing the game and running the movement suite still need no npm packages.
+The browser check writes review screenshots under `build/browser-checks/`. For level work, `node tools/level_map.mjs hoarfrost` draws a top-down SVG map of a level's floors, route and pickups, and `node tools/level_shots.mjs` renders screenshots from chosen camera positions (Playwright, like the browser check). Set `BROWSER_EXECUTABLE_PATH` to use an existing Chromium executable. Playwright is only needed for this optional check; playing the game and running the movement suite still need no npm packages.
 
 Rebuild the checked-in browser core with [WASI SDK 25](https://github.com/WebAssembly/wasi-sdk/releases/tag/wasi-sdk-25):
 

@@ -91,6 +91,14 @@ try {
   await openMenu(page);await page.locator('#restart-world').click();assert.equal(await count(page),0);
   assert.match(await page.locator('#checkpoint-name').textContent(),/runway/);
   await world(page,'caldera');assert.equal(await count(page),savedCoins,'restarting practice leaves the adventure intact');
+  // Hoarfrost Heights: its own HUD totals and objectives, and progress kept like the others.
+  await world(page,'hoarfrost');assert.equal(await page.locator('#shard-max').textContent(),'/5');
+  assert.match(await page.locator('#checkpoint-name').textContent(),/Frostmere Camp/);
+  await page.keyboard.down('w');await page.waitForTimeout(1200);await page.keyboard.up('w');
+  await openMenu(page);assert.match(await page.locator('#objectives').textContent(),/Icefall Star.*Frost Shards.*snowed in/);
+  await page.locator('#menu').evaluate(el=>el.scrollTop=0);await page.screenshot({path:path.join(out,'hoarfrost-menu.png')});
+  await page.locator('#resume-button').click();await page.screenshot({path:path.join(out,'hoarfrost.png')});
+  await world(page,'caldera');assert.equal(await count(page),savedCoins,'visiting the ice level leaves the adventure intact');
   await openMenu(page);await page.locator('#setting-developer').check();
   await page.locator('#setting-volume').fill('35');await page.locator('#setting-deadzone').fill('22');
   assert.equal(await page.locator('#volume-value').textContent(),'35%');
@@ -105,7 +113,7 @@ try {
   assert.equal(await page.locator('#setting-music').inputValue(),'0');await page.locator('#setting-music').fill('50');
   await page.locator('#setting-developer').uncheck();await page.locator('#resume-button').click();
   await page.screenshot({path:path.join(out,'playground.png')});
-  console.log('PASS world switching, preserved pickups/checkpoints, independent restart and saved settings, volumes and dead zone');
+  console.log('PASS world switching (three worlds), preserved pickups/checkpoints, independent restart and saved settings, volumes and dead zone');
   await page.context().browser().close();
 
   const touch=await pageFor({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:1});

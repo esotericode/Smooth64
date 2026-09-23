@@ -63,7 +63,7 @@ def package():
 
 1. Extract this ZIP (right-click it, then Extract All on Windows).
 2. Double-click Smooth64-Play.html.
-3. Click Play Cinder Caldera, or Visit the playground.
+3. Click Play Cinder Caldera, Play Hoarfrost Heights, or Visit the playground.
 
 If asked which app to use, choose Microsoft Edge, Chrome, or Firefox.
 No installation, account, internet connection, Python, terminal, or ROM needed.
@@ -89,6 +89,14 @@ CINDER CALDERA: climb the volcanic Spire to the Ember Star. Lava burns three
 wedges of health; coins heal one. Touch beacons to set your checkpoint (R returns
 there). Eight red Ember Shards hide behind optional challenges; all eight light
 the Crimson Star on the lava altar.
+
+HOARFROST HEIGHTS (new, part one): cross the frozen lake, the snowbound forest
+and the glacier, then climb the icefall to the Icefall Star on the Horn's
+Shoulder. Blue ice will not hold you: you slide on it, cannot climb it, and a
+full run skids a long way. Let go of the stick as you land to stop dead. Deep
+snow slows your run; grey rock grips even when steep. Open water bites like
+lava. Five blue Frost Shards hide behind optional challenges. The upper Horn
+is snowed in for now.
 
 PLAYGROUND: eleven practice areas, including the new lava crossing. Find 34
 healing coins across the original courses and trails. Menu > Practice destinations

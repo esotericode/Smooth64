@@ -79,6 +79,26 @@ In Chromium, the browser check confirms that the music starts only when play beg
 
 Commands are in the README. The cross-compiler test runs the same inputs through the actual native shared library and committed WASM, not a JavaScript rewrite of physics.
 
+## Hoarfrost Heights, part one
+
+The suite now passes **15 native tests and 74 Node tests**. `tests/hoarfrost.test.mjs` drives the unchanged core through the new level with controller plans from `tests/routes.mjs`:
+
+- Geometry: 1,910 triangles, within part one's 2,200 budget (the core holds 4,096). Integer coordinates, no degenerate triangles, frostbite water only ever a floor at y = 0, a catch floor under every gap, every pickup over solid ground except the two coins that trace the chute jump, and unique ids.
+- Every checkpoint settles on its own floor.
+- Surfaces as the level assumes: frostbite water costs three wedges and launches you; ice keeps skidding after you let go mid-run, but a landing stops you dead; the grippy rock rib climbs where its icy twin cannot; deep snow caps a run at ~24.
+- Main route, all four parts:
+  - camp → floes → the tilted floe's slide jump → the ice runway → the long jump (a plain jump falls into the water);
+  - the deep-snow grabs, the broken iced log, and the slippery ramp;
+  - the crevasse jump, the snow bridge, and the chute. It slides at over 80 units a tick, at least eight jump points before the lip clear the Great Crevasse, and sliding off without a jump fails. A good jump collects both arc coins;
+  - the serac grab, 950 units of chimney wall kicks, the rock rib, the bergschrund, and the cairn under the Icefall Star.
+- All five Frost Shards. The watchtower needs a backflip or double jump (a single jump cannot reach it). The Lone Floe needs you to stop on landing. Each of the Great Pine's four boughs is climbed. The crevasse ledge is reached by hanging and dropping, then wall-kicking out. The serac needle needs a double jump (a single jump falls short).
+- The lake's side loop leads back to camp, hop by hop.
+- The upper Horn stays sealed: runs, jumps and double jumps at the Horn's face and the snowbank never stand above y 5,000.
+- The Icefall Star is the goal and stops the clock. With no bonus star in part one, finding every shard reveals nothing yet. The menu objectives name real pickups, and the victory copy counts the shards left.
+- Native/WASM parity: all 80 state bytes on every tick of 300-tick random input streams from each of the six checkpoints, with coin heals mixed in (1,800 ticks).
+
+The shared gameplay tests now include the new world: coins, checkpoint recovery, restart, and frostbite damage with coin healing. The browser check switches between all three worlds, checks Hoarfrost's HUD totals and objectives, and confirms that visiting it leaves the Caldera's progress intact. During development, a scan dropped the explorer over every gap under the route. Every fall either ended below y −1,500, ended in a ledge grab, or landed in the lake. A slope that could have trapped a fall under the bergschrund was removed.
+
 ## Practical limits
 
 The polish pass was exercised in headless Chromium with software WebGL, including desktop (1280 × 800), touch (390 × 844), and the offline single-file build. The browser regression check passes with no JavaScript or WebGL errors, including storage-unavailable fallback and zero network asset requests in the offline build. Desktop and touch screenshots were inspected. This is automated interaction and visual verification, not a human play session. Gamepad edges are tested with mocked standard-gamepad input; physical gamepad behavior, Firefox/Safari, and performance on target devices still need hands-on verification.
