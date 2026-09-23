@@ -60,17 +60,24 @@ The suite now passes **15 native tests and 52 Node tests**. The native/WASM pari
 
 In Chromium, the MP3 sprite decodes to its exact length with the sync marker in place. The browser check hears footsteps and the coin chime during real play and confirms that the new sliders persist across reload. A separate offline-file run played footsteps, a coin, the braking scrape, a jump, and its landing from `file://` with no network requests, errors, or warnings. Levels were measured by rendering every cue through the real audio graph offline. At the default volume the loudest single cue peaks near −2 dBFS, and a soft clipper only rounds pile-ups at full volume. These are automated measurements, not a listening session on speakers or headphones.
 
-`tools/test_browser.mjs` is the optional browser regression check. It exercises the real UI: clean defaults, footstep and pickup sounds, pause/nested controls, keyboard activation without a queued jump, exact frame stepping, developer toggles, retained per-world progress, independent restart, settings persistence (including volume and dead zone), touch controls, mobile layout, and the offline file with storage unavailable. It also checks for browser/WebGL errors and network requests from the offline build. Review screenshots go to `build/browser-checks/`.
+## Music checks
+
+The suite now passes **15 native tests and 61 Node tests**. `tests/music.test.mjs` runs the real music engine against a recording Web Audio stand-in:
+
+- Note names, chord symbols, and chord-relative degrees parse, including sus and sixth chords, octave marks, and invalid input.
+- Every track's melody exactly fills its chord cycle; melody notes on a beat or held for one never sit a half step above a chord tone; every note stays in its part's range; every track starts and ends without its melody; tempos stay between 60 and 96 BPM.
+- Pad voicings keep the chord's third (or sus tone), use only chord tones, and move each voice by a fourth or less.
+- Half an hour of simulated play: every track plays before any repeats and never twice in a row; each hand-over starts 1–2.5 s after the last bar, in a key sharing at least three notes with the ringing chord; the longest silence from the first note on is under 50 ms; every note is scheduled between 50 ms late and 0.4 s ahead.
+- A seed replays the same running order, and different seeds vary it. A 3 s stall skips the missed notes and carries on.
+- Menus muffle and lower the music, jingles duck it on time, a stop fades ringing notes too, and a restart begins a fresh track at that track's level.
+- Settings saved by v0.5.0's music switch keep a mute (switch off or volume 0) and otherwise start at the 50% default. At 0% the slider reads "Off".
+- Through `GameAudio`: no music before play or before a user gesture; music volume squares into gain; 0% stops the music and raising it starts a new track; coins do not duck; a hidden tab suspends audio until it is visible again, even if input arrives; a music failure warns once and leaves the sound effects working.
+
+In Chromium, the browser check confirms that the music starts only when play begins, schedules notes continuously, stops at 0%, keeps its slider setting across reloads, and plays from the offline file. `tools/render_music.mjs` rendered every track through the same engine offline. Each full visit measures −18.4 to −19.1 LUFS before the music volume (peaks −1.8 to −5.5 dBFS), with a short-term loudness range of about 4 LU and the top end rolled off above 9 kHz. The hand-over between tracks has no dip in loudness. Rendering the whole game audio graph offline at default settings put a track's sparse opening at −36 LUFS, which puts a whole track near −34.5 LUFS. Footsteps reached −26 LUFS momentary over it, a coin −17, and the star and shard jingles −15 and −8. The music CPU cost measured 7–11% of one core when rendered offline in Chromium. These are measurements, not a listening test on speakers or headphones.
+
+`tools/test_browser.mjs` is the optional browser regression check. It exercises the real UI: clean defaults, music, footstep and pickup sounds, pause/nested controls, keyboard activation without a queued jump, exact frame stepping, developer toggles, retained per-world progress, independent restart, settings persistence (including both volumes and the dead zone), touch controls, mobile layout, and the offline file with storage unavailable. It also checks for browser/WebGL errors and network requests from the offline build. Review screenshots go to `build/browser-checks/`.
 
 Commands are in the README. The cross-compiler test runs the same inputs through the actual native shared library and committed WASM, not a JavaScript rewrite of physics.
-
-## Original soundtrack checks
-
-Version 0.5.0 passes **15 native tests and 57 Node tests**, retaining the movement, sound-effect, input, and presentation coverage above. The five music checks cover complete scores, compatible sparse transition sections, no-repeat shuffle rounds, settings migration and validation, lazy audio allocation, bounded scheduling across multiple tracks, and recovery from a long stall without a burst of overdue notes.
-
-`tools/test_music_browser.mjs` rendered all four complete pieces through Chromium's actual Web Audio graph, including filters, stereo reverb, and envelopes. At full music volume their peaks were 0.199–0.225 and their RMS levels 0.033–0.040; the default 30% setting is a further 10.5 dB quieter. Every one of the twelve possible ordered crossfades was rendered and checked for clipping and silent gaps. The real-time graph was also exercised at the device sample rate, which differs from the 22,050 Hz sample bank; convolution impulses use the device rate.
-
-Real-time checks passed for gesture startup, menu ducking, mute, stopped audio time while suspended, focus loss and return, retained playback on unmute, and rapid repeated toggles without duplicate streams. The integrated browser test passed with both music and the v0.4.0 sound effects: saved music volume and mute, independent effect volume, a single persistent music player through world changes/retries, touch slider layout, and the offline HTML with storage unavailable and no network requests. No JavaScript or WebGL errors were recorded. These are automated render and playback measurements, not a listening session on speakers or headphones.
 
 ## Practical limits
 

@@ -9,20 +9,20 @@
 2. Double-click **Smooth64-Play.html**.
 3. Click **Cinder Caldera** for the level, or **Movement playground** for the test areas.
 
-Works offline in Edge, Chrome, or Firefox. No installation, Python, terminal, compiler, or ROM required. **WASD** moves, **Space** jumps, **Shift** crouches, **J** attacks. Sound starts after your first click or key press.
+Works offline in Edge, Chrome, or Firefox. No installation, Python, terminal, compiler, or ROM required. **WASD** moves, **Space** jumps, **Shift** crouches, **J** attacks. Sound and music start after your first click or key press.
 
 The original recovery ZIP is kept in this repository. The folders below contain the editable project source.
 
 
 A ROM-free platformer built around the Super Mario 64 US movement code, with an original explorer, a volcanic adventure, and a connected practice playground.
 
-## Version 0.5.0 — quiet trails
+## Original music
 
-Four original, understated pieces add a mellow late-1990s console atmosphere: **Mosslight Path**, **Clouds Beyond the Ridge**, **Embers at Rest**, and **Paper Lantern Sky**. Soft mallets, airy flute, warm keys, and rounded bass leave room for exploring. Each piece runs two minutes, with sparse melodies and long rests.
+Four original tracks play quietly in the background, in the spirit of late-'90s console soundtracks: *Basalt Tide* (electric piano, strings and vibraphone), *Hush of the Spire* (a harp and music-box lullaby in three), *Lantern Trail* (marimba, brushes and ocarina), and *Skyline Drift* (a choir pad and bells). They are written as note data in `web/tracks.js` and performed live by a small Web Audio synthesizer in `web/music.js`, with no recordings, so the whole soundtrack adds about 20 KB.
 
-Tracks shuffle without immediate repeats and blend over twelve seconds. Music starts at a quiet **30%**, softens in menus, keeps playing across world changes and retries, and fades out when the game window loses focus. **Menu → Settings** has a music switch and volume slider, separate from sound effects. Preferences are saved. All four tracks work in the offline HTML without fetching any music assets.
+Tracks come from a shuffle bag: all four play before any repeats, never the same one twice in a row. Each track opens and closes sparsely and ends on a ringing chord. The next one starts over that chord, in whichever nearby key shares the most notes with it, so the music drifts from one piece to the next without a gap. Menus muffle it, the shard and star jingles briefly duck it, and it pauses while the tab is hidden. **Menu → Settings → Music** sets its volume: 50% by default, well under the sound effects; 0% turns it off.
 
-[Soundtrack notes and WAV export](docs/SOUNDTRACK.md) · [Quiet trails release notes](docs/releases/v0.5.0.md)
+[Soundtrack notes: the tracks, editing the scores, and rendering them](docs/SOUNDTRACK.md)
 
 ## Version 0.4.0 — sound, timed by the movement code
 
@@ -111,7 +111,7 @@ The playground contains a runway, walkable ramps, a steep slippery slope, a wall
 | Quarter speed (developer tools) | T | On-screen button |
 | Collision mesh (developer tools) | V | On-screen button |
 | Move guide | ? or H | Controls button |
-| Sound volume, stick dead zone | Menu → Settings | Start → Settings |
+| Sound and music volume, stick dead zone | Menu → Settings | Start → Settings |
 
 Touch devices get an analog pad and A/B/Z buttons. Keyboard buttons retain very short taps until the next simulation tick. Gamepad input is sampled on simulation ticks, with a 15% radial dead zone on both sticks. Losing window focus pauses the simulation and clears keyboard input.
 
@@ -166,7 +166,6 @@ npm install --no-save playwright
 npx playwright install chromium
 python3 tools/package_browser.py
 npm run test:browser
-npm run test:music
 ```
 
 The browser check writes review screenshots under `build/browser-checks/`. Set `BROWSER_EXECUTABLE_PATH` to use an existing Chromium executable. Playwright is only needed for this optional check; playing the game and running the movement suite still need no npm packages.
@@ -180,8 +179,8 @@ python3 tools/build.py wasm
 
 The build uses `-fno-fast-math`, `-ffp-contract=off`, `-fwrapv`, and `-fno-strict-aliasing`.
 
-The sound sprite (`web/sounds.mp3` and its index `web/sounds.js`) is also checked in. Maintainers can rebuild it from the pinned CC0 sources with `python3 tools/build_sounds.py`; that needs ffmpeg with libmp3lame and network access. Native `.so` building has been tested on Linux; the **ready-built browser demo runs on other desktop operating systems** without compiling C.
+The sound sprite (`web/sounds.mp3` and its index `web/sounds.js`) is also checked in. Maintainers can rebuild it from the pinned CC0 sources with `python3 tools/build_sounds.py`; that needs ffmpeg with libmp3lame and network access. The music has no build step: `web/tracks.js` is the score. `node tools/render_music.mjs` (Playwright, like the browser check) renders each track to `build/music/` for listening and level checks. Native `.so` building has been tested on Linux; the **ready-built browser demo runs on other desktop operating systems** without compiling C.
 
 [Architecture and embedding](docs/ARCHITECTURE.md) · [Verification](docs/VERIFICATION.md) · [Sources and licenses](THIRD_PARTY.md)
 
-No ROM loading or asset extraction is implemented. No Nintendo model, texture, sound, level, or skeletal pose data is bundled; the sound effects are Kenney's CC0 samples. Small source-derived animation timing and root XYZ movement tables are included because the movement logic reads them; see the source notes rather than treating the simulation as independent of all animation data.
+No ROM loading or asset extraction is implemented. No Nintendo model, texture, sound, music, level, or skeletal pose data is bundled; the sound effects are Kenney's CC0 samples and the music is original. Small source-derived animation timing and root XYZ movement tables are included because the movement logic reads them; see the source notes rather than treating the simulation as independent of all animation data.

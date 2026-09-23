@@ -32,6 +32,16 @@ class FakeContext {
     return Promise.resolve(buffer);
   }
   resume(){this.state='running';return Promise.resolve();}
+  suspend(){this.state='suspended';return Promise.resolve();}
+}
+// Records what GameAudio asks of the music.
+class FakeMusic {
+  constructor(ctx,output){this.ctx=ctx;this.output=output;this.playing=false;this.calls=[];}
+  start(){this.playing=true;this.calls.push('start');}
+  stop(){this.playing=false;this.calls.push('stop');}
+  update(){}
+  setPaused(paused){this.calls.push(paused?'muffle':'clear');}
+  duck(seconds,delay){this.calls.push(`duck ${seconds} ${delay}`);}
 }
 async function ready(options={}) {
   const ctx=new FakeContext(options.delay),audio=new GameAudio({createContext:()=>ctx,...options});
@@ -129,4 +139,36 @@ test('every cue names real samples, and pickups have distinct voices',async()=>{
   }
   const first=cue=>{const before=ctx.started.length;audio.cue(cue);return sampleOf(ctx.started[before]);};
   assert.equal(new Set(['coin','shard','star','reveal','lose'].map(first)).size,5);
+});
+
+test('music starts with play, follows its own volume, muffles, ducks under jingles and sleeps with the tab',async()=>{
+  let music=null;
+  const {ctx,audio}=await ready({music:.5,createMusic:(context,output)=>music=new FakeMusic(context,output)});
+  assert.equal(music,null,'no music on the title screen');
+  audio.playMusic();assert.deepEqual(music.calls,['start']);
+  assert.equal(music.output,audio.musicBus);assert.ok(Math.abs(audio.musicBus.gain.value/.25-.63)<1e-12,'music volume squares into gain');
+  audio.setMusicVolume(0);audio.setMusicVolume(0);audio.setMusicVolume(.6);
+  assert.deepEqual(music.calls,['start','stop','start'],'0% stops the music; raising it starts a new track');
+  assert.ok(Math.abs(audio.musicBus.gain.value/.36-.63)<1e-12);
+  audio.pauseMusic(true);audio.pauseMusic(false);
+  audio.cue('star');audio.cue('reveal',{delay:.75});audio.cue('coin');
+  assert.deepEqual(music.calls.slice(3),['muffle','clear','duck 1.2 0','duck 1 0.75'],'coins do not duck');
+  audio.setHidden(true);assert.equal(ctx.state,'suspended');audio.unlock();assert.equal(ctx.state,'suspended','stays asleep while hidden');
+  audio.setHidden(false);assert.equal(ctx.state,'running');
+  audio.setMusicVolume(0);clearInterval(audio.timer);
+});
+
+test('music waits for a gesture, and a music failure leaves the game and its sounds alone',async()=>{
+  let made=0;const early=new GameAudio({createContext:()=>new FakeContext(),createMusic:()=>{made++;return new FakeMusic();}});
+  early.playMusic();assert.equal(made,0,'nothing before the first gesture');
+  early.unlock();assert.equal(made,1,'the gesture that unlocks audio starts the wanted music');early.setMusicVolume(0);
+  const warn=console.warn;const warnings=[];console.warn=(...args)=>warnings.push(args.join(' '));
+  try {
+    const {ctx,audio}=await ready({createMusic:()=>{throw new Error('no oscillators');}});
+    audio.playMusic();audio.playMusic();assert.equal(warnings.length,1);assert.equal(audio.timer,null);
+    const before=ctx.started.length;audio.cue('coin');assert.ok(ctx.started.length>before,'effects still play');
+    const broken=new FakeMusic();broken.update=()=>{throw new Error('lost');};
+    const second=await ready({createMusic:()=>broken});second.audio.playMusic();second.audio.updateMusic();
+    assert.equal(warnings.length,2);assert.equal(broken.playing,false);assert.equal(second.audio.timer,null);
+  } finally {console.warn=warn;}
 });

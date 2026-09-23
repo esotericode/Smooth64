@@ -1,34 +1,44 @@
-# Quiet trails
+# Soundtrack
 
-Four original pieces for wandering through Smooth64. The palette recalls a late-1990s console: soft, rounded mallets, breathy flute, electric keys, a low music-box bell, warm sustained chords, and a little plucked bass. Melodies leave room for the world. Percussion is occasional and subdued; there are no vocals or insistent drum loops.
+Four original pieces, composed for Smooth64 and performed live by the game. There are no recordings: `web/tracks.js` holds the scores, and `web/music.js` synthesizes every instrument with Web Audio.
 
-| Track | Length | Character |
-|---|---|---|
-| Mosslight Path | 2:00 | Wooden mallets and small, falling phrases |
-| Clouds Beyond the Ridge | 2:00 | Long flute breaths over open chords |
-| Embers at Rest | 2:00 | Low electric keys and a gentle minor-key turn |
-| Paper Lantern Sky | 2:00 | A soft music-box figure with distant flute answers |
+| Track | Key and time | Instruments | Character |
+|---|---|---|---|
+| Basalt Tide | F major, 4/4, 72 BPM | Electric piano, strings, fretless bass, shaker; vibraphone melody, later ocarina | Drifting major ninths with a wistful turn to D♭ |
+| Hush of the Spire | A minor, 3/4, 66 BPM | Harp, strings, upright bass; music-box melody, later vibraphone an octave down | A lullaby rocking in three |
+| Lantern Trail | G major, swung 4/4, 88 BPM | Marimba, fretless bass, kick and brushes, strings; ocarina melody, later vibraphone | An easy walk at dusk |
+| Skyline Drift | D Dorian, 4/4, 68 BPM | Choir pad, sub bass, electric piano; bells | Long chords and a few bells, like passing clouds |
 
-Music starts when you begin playing, at 30% volume. **Menu → Settings** has a background music switch and an independent music volume slider. Effects retain their own volume. Settings survive reloads, including silence.
+## How it plays
 
-The playlist shuffles all four pieces without replacement; consecutive tracks never repeat, even between shuffle rounds. Each transition overlaps the last and first four bars for twelve seconds. The music keeps its place across checkpoints, retries, and world changes, becomes softer in menus, and fades out while the game window is inactive. Returning or unmuting resumes playback. The soundtrack is included in the offline HTML.
+A visit to a track plays its chord cycle several times (passes), about 3½–4½ minutes in all. The first and last passes leave the melody out, so every track opens and closes quietly. The last chord rings on for 3.5 seconds. The next track starts under it 1–2.5 seconds after the final bar, transposed by up to three semitones into whichever key shares the most notes with the ringing chord.
 
-## Score and instruments
+Tracks come from a shuffle bag: all four play before any repeats, and never the same one twice in a row, even across a restart. Timing and velocity are humanized slightly, so no two visits are identical. Each track has a loudness level that keeps the four within about 0.7 LU of each other.
 
-`web/soundtrack.js` contains the authored notes, phrasing, harmony, and arrangement for each piece. All four use 80 BPM and the D major / B minor pitch collection, with compatible Dadd9 introductions and endings. Forty-bar arrangements have a four-bar introduction, eight four-bar phrases with variations and rests, and a four-bar ending. The bookends carry only pad and bass, leaving space for an equal-power crossfade.
+In the game, **Menu → Settings → Music** sets the volume (50% by default, about −34 LUFS, well under the footsteps); 0% stops it. Menus muffle the music, the shard, star and reveal jingles duck it, and a hidden tab suspends the game's audio until you return.
 
-`web/music-synth.js` creates the original instrument samples at 22,050 Hz, a stereo reverb at the output device's sample rate, and smooth note envelopes. No sampled commercial music, Nintendo audio, external soundfonts, or downloaded instruments are used. Scores, synthesis, and rendered music are original Smooth64 material under the repository's MIT license. Sound effects have their own CC0 provenance in `THIRD_PARTY.md`.
+## Editing the score
 
-`web/music.js` schedules notes against the audio clock with a short lookahead, independently of physics and rendering. Finished voices and track buses are disconnected. Music allocates no audio resources before play or when a saved mute is active. Muting or losing focus fades the music and suspends its context without suspending sound effects. A late scheduler skips stale notes; a long interruption restarts gently rather than replaying a backlog. A missing or blocked audio device never prevents play.
+Each entry in `web/tracks.js` is data:
 
-## Check or export the pieces
+- `chords`: symbols with lengths in beats, such as `Fmaj9:8 Bbmaj9:8`. Qualities: major, `m`, `7`, `maj7`, `m7`, `6`, `m6`, `69`, `9`, `maj9`, `m9`, `13`, `sus2`, `sus4`, `7sus4`, `9sus4`.
+- `parts`:
+  - `pad` is voiced automatically: colour tones first, each voice moving as little as possible, within `range` (MIDI notes).
+  - `arp` and `bass` patterns are chord degrees (`1 3 5 7 9 11 13`, `8` for the octave), with `'` or `,` for an octave up or down, and `r` for a rest. Arpeggios step every `step` beats around `center`. Bass steps carry their own lengths (`1:2.5 5:1.5`) and sit above `low`. Because they are relative to the chord, patterns follow every chord and transposition.
+  - Drum parts give one string per drum, `step` beats per character: `x` accent, `o` soft, `.` rest.
+  - `lead` lines are note names with lengths (`E5:1.5 D5:.5`), `r` for rests, and `|` between bars for readability.
+- `passes`: the parts playing on each time through the cycle. `lead:A@vibes-12` plays melody A on vibraphone an octave down.
+- `level`: a loudness trim for the whole track.
 
-Using the optional Playwright/Chromium setup described in the README:
+The unit tests check that every melody exactly fills the chord cycle, and that no melody note on a beat, or held for one, sits a half step above a chord tone. They also check that every note stays in its part's range, that the first and last passes have no melody, and that the tracks hand over without silence.
+
+## Listening and levels
+
+With the optional Playwright setup from the README:
 
 ```sh
-npm run test:music
-# Also export all four pieces as stereo PCM WAVs:
-node tools/test_music_browser.mjs --render
+node tools/render_music.mjs                  # every track: build/music/<id>.wav
+node tools/render_music.mjs lantern-trail skyline-drift --transition
 ```
 
-WAV files and measured levels go to `build/music-checks/`. The exporter uses the same scores, samples, filters, and reverb as the game. WAVs use the full music setting, with three extra seconds for the reverb tail; in-game playback defaults to 30%. The check renders every complete piece and all twelve ordered transitions, and exercises real audio startup, volume, menu ducking, suspension, resumption, and rapid toggles.
+Each WAV is one full visit through the game's own engine, at full music volume and without the in-game trim. Keep new tracks near −18.5 LUFS integrated (adjust `level`), as the current four are.

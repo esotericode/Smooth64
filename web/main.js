@@ -9,12 +9,10 @@ import {HEALTH,healthWedges,respawnReason} from './rules.js';
 import {loadSettings,saveSettings,SETTING_RANGES} from './settings.js';
 import {actionCue} from './pose.js';
 import {GameAudio} from './audio.js';
-import {MusicPlayer} from './music.js';
 
 const $=id=>document.getElementById(id);
 const canvas=$('game'),menu=$('menu'),help=$('help'),victory=$('victory');
-const clock=new FixedClock(),settings=loadSettings(),audio=new GameAudio({volume:settings.volume});
-const music=new MusicPlayer({enabled:settings.music,volume:settings.musicVolume});
+const clock=new FixedClock(),settings=loadSettings(),audio=new GameAudio({volume:settings.volume,music:settings.music});
 // Sounds are optional: the game starts without them if the file is missing.
 fetch('sounds.mp3').then(response=>response.ok?response.arrayBuffer():null).then(bytes=>bytes&&audio.load(bytes)).catch(()=>{});
 // Browsers let a page start audio only after a click, tap or key press.
@@ -37,7 +35,6 @@ function syncInput() {
   document.body.classList.toggle('modal-open',modalOpen());
   $('freeze-button').setAttribute('aria-pressed',debugPaused);
   write('freeze-button',debugPaused?'Unfreeze':'Freeze');
-  music.setDucked(modalOpen()||debugPaused);
 }
 function syncPause() {clock.reset();input?.clear();audio.hush();syncInput();}
 function cancelRespawn() {respawning=0;$('fade').hidden=true;}
@@ -75,7 +72,7 @@ function setMode(next) {
 }
 function start(next='caldera') {
   if(!core||started)return;
-  started=true;document.body.classList.add('playing');$('welcome').hidden=true;renderer.intro=false;audio.unlock();music.start();
+  started=true;document.body.classList.add('playing');$('welcome').hidden=true;renderer.intro=false;audio.unlock();audio.playMusic();
   if(next!==mode)setMode(next);else reset();
   for(const id of ['menu-button','level-hud','location'])$(id).hidden=false;
   applySettings();
@@ -98,12 +95,10 @@ function applySettings() {
   document.body.classList.toggle('developer',settings.developer);
   for(const [key,value] of Object.entries(settings)) {
     if(!SETTING_RANGES[key]){$(`setting-${key}`).checked=value;continue;}
-    const label=key==='musicVolume'&&value===0?'Off':`${Math.round(value*100)}%`;
-    $(`setting-${key}`).value=Math.round(value*100);write(`${key}-value`,label);
-    $(`setting-${key}`).setAttribute('aria-valuetext',label);
+    const label=key==='music'&&value===0?'Off':`${Math.round(value*100)}%`;
+    $(`setting-${key}`).value=Math.round(value*100);write(`${key}-value`,label);$(`setting-${key}`).setAttribute('aria-valuetext',label);
   }
-  audio.setVolume(settings.volume);if(input)input.deadzone=settings.deadzone;
-  music.configure(settings.music,settings.musicVolume);
+  audio.setVolume(settings.volume);audio.setMusicVolume(settings.music);if(input)input.deadzone=settings.deadzone;
   for(const id of ['telemetry','toolbar','render-stats'])$(id).hidden=!started||!settings.developer;
   $('technical-guide').hidden=!settings.developer;$('timer-hud').hidden=!settings.timer;
   if(!settings.developer) {
@@ -269,6 +264,7 @@ function renderHud() {
 function frame(now) {
   const dt=Math.min((now-last)/1000||0,.1);last=now;input.pollCommands();
   if(paused()||respawning)audio.hush();
+  audio.pauseMusic(modalOpen());
   if(started&&!modalOpen()) {
     const delta=input.cameraDelta(dt);renderer.yaw+=delta.yaw;
     renderer.pitch=Math.max(.12,Math.min(1.25,renderer.pitch+delta.pitch));
@@ -306,7 +302,7 @@ $('slow-button').addEventListener('click',()=>{slow=!slow;applySettings();canvas
 $('wire-button').addEventListener('click',()=>{renderer.wire.visible=!renderer.wire.visible;applySettings();canvas.focus();});
 $('trail-button').addEventListener('click',()=>{renderer.trail.visible=!renderer.trail.visible;applySettings();canvas.focus();});
 for(const key of Object.keys(settings))$(`setting-${key}`).addEventListener(SETTING_RANGES[key]?'input':'change',e=>{
-  settings[key]=SETTING_RANGES[key]?Number(e.target.value)/100:e.target.checked;saveSettings(settings);applySettings();music.unlock();
+  settings[key]=SETTING_RANGES[key]?Number(e.target.value)/100:e.target.checked;saveSettings(settings);applySettings();
   // Let the new volume be heard while dragging, without a burst of coins.
   if(key==='volume'&&performance.now()>previewTimer){previewTimer=performance.now()+180;audio.unlock();audio.cue('coin');}
 });
@@ -314,15 +310,8 @@ for(const button of document.querySelectorAll('[data-mode]'))button.addEventList
   if(button.dataset.mode!==mode){setMode(button.dataset.mode);toast(`Welcome back to ${world.name}.`);}
   menu.close();
 });
-window.addEventListener('blur',()=>{music.setActive(false);if(started&&!modalOpen())openMenu();});
-window.addEventListener('focus',()=>music.setActive(!document.hidden));
-document.addEventListener('visibilitychange',()=>{
-  music.setActive(!document.hidden&&document.hasFocus());
-  if(document.hidden&&started&&!modalOpen())openMenu();
-});
-window.addEventListener('pagehide',()=>music.setActive(false));
-window.addEventListener('pageshow',()=>music.setActive(!document.hidden));
-for(const event of ['pointerdown','keydown','touchend'])document.addEventListener(event,()=>{if(started)music.unlock();},{passive:true});
+window.addEventListener('blur',()=>{if(started&&!modalOpen())openMenu();});
+document.addEventListener('visibilitychange',()=>{audio.setHidden(document.hidden);if(document.hidden&&started&&!modalOpen())openMenu();});
 
 try {
   worlds={playground:createWorld(),caldera:createCaldera()};
