@@ -24,6 +24,14 @@ const errors=[],browsers=[];
 async function pageFor(context) {
   const browser=await chromium.launch(options);browsers.push(browser);
   const page=await browser.newPage(context);
+  await page.addInitScript(()=>{
+    const Native=window.AudioContext;window.testAudioContexts=[];
+    window.AudioContext=class extends Native {
+      constructor(...args){super(...args);window.testAudioContexts.push(this);}
+      createConvolver(){this.testMusic=true;return super.createConvolver();}
+    };
+    window.testMusicContext=()=>window.testAudioContexts.find(ctx=>ctx.testMusic);
+  });
   page.setDefaultTimeout(30000);
   page.on('pageerror',error=>errors.push(error.message));
   page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
@@ -42,8 +50,10 @@ try {
     AudioBufferSourceNode.prototype.start=function(...args){window.__sounds.push(Math.round(this.buffer.duration*1000));return start.apply(this,args);};
   });
   await page.goto(url);await ready(page);
+  assert.equal(await page.evaluate(()=>window.testAudioContexts.length),0,'the welcome screen is silent');
   await page.screenshot({path:path.join(out,'welcome.png')});
   await page.keyboard.press('Space');await page.locator('#level-hud').waitFor();
+  await page.waitForFunction(()=>window.testMusicContext()?.state==='running');
   assert.equal(await page.locator('#telemetry').isVisible(),false);assert.equal(await page.locator('#toolbar').isVisible(),false);
   assert.equal(await page.locator('#timer-hud').isVisible(),false);
   const {SAMPLES}=await import(pathToFileURL(path.join(web,'sounds.js')).href);
@@ -73,6 +83,15 @@ try {
   await page.waitForFunction(before=>document.getElementById('level-time').textContent!==before,time);
   console.log('PASS clean defaults, footstep and pickup sounds, modal input, nested help, developer gating, pause and exact stepping');
 
+  await openMenu(page);assert.equal(await page.locator('#setting-music').isChecked(),true);
+  assert.equal(await page.locator('#setting-musicVolume').inputValue(),'30');
+  await page.locator('#setting-music').uncheck();await page.waitForFunction(()=>window.testMusicContext().state==='suspended');
+  await page.locator('#setting-musicVolume').fill('45');
+  assert.equal(await page.locator('#musicVolume-value').textContent(),'45%');
+  await page.locator('#setting-music').check();await page.waitForFunction(()=>window.testMusicContext().state==='running');
+  await page.locator('#resume-button').click();
+  console.log('PASS music gesture startup, quiet default, mute and volume controls');
+
   await openMenu(page);savedCoins=await count(page);await page.locator('[data-mode="playground"]').click();assert.equal(await count(page),0);assert.equal(await page.locator('#shards-hud').isVisible(),false);
   assert.equal(await page.locator('#power-meter').isVisible(),true);
   await destination(page,9);await page.waitForFunction(()=>Number(document.getElementById('coin-count').textContent)>0);
@@ -85,12 +104,17 @@ try {
   await openMenu(page);await page.locator('#restart-world').click();assert.equal(await count(page),0);
   assert.match(await page.locator('#checkpoint-name').textContent(),/runway/);
   await world(page,'caldera');assert.equal(await count(page),savedCoins,'restarting practice leaves the adventure intact');
+  assert.equal(await page.evaluate(()=>window.testAudioContexts.filter(ctx=>ctx.testMusic).length),1,'world changes and retries share one soundtrack');
   await openMenu(page);await page.locator('#setting-developer').check();
   await page.locator('#setting-volume').fill('35');await page.locator('#setting-deadzone').fill('22');
   assert.equal(await page.locator('#volume-value').textContent(),'35%');
   await page.reload();await ready(page);await page.locator('#start').click();assert.equal(await page.locator('#telemetry').isVisible(),true);
   await openMenu(page);assert.equal(await page.locator('#setting-developer').isChecked(),true);
   assert.equal(await page.locator('#setting-volume').inputValue(),'35');assert.equal(await page.locator('#deadzone-value').textContent(),'22%');
+  assert.equal(await page.locator('#setting-musicVolume').inputValue(),'45','music volume persists');
+  await page.locator('#setting-music').uncheck();await page.reload();await ready(page);
+  await page.locator('#start').click();assert.equal(await page.evaluate(()=>window.testAudioContexts.filter(ctx=>ctx.testMusic).length),0,'saved mute prevents audio allocation');
+  await openMenu(page);assert.equal(await page.locator('#setting-music').isChecked(),false);await page.locator('#setting-music').check();
   await page.locator('#setting-developer').uncheck();await page.locator('#resume-button').click();
   await page.screenshot({path:path.join(out,'playground.png')});
   console.log('PASS world switching, preserved pickups/checkpoints, independent restart and saved settings, volume and dead zone');
@@ -102,6 +126,7 @@ try {
   await touch.locator('[data-touch="1"]').tap();
   await touch.screenshot({path:path.join(out,'touch-play.png')});
   await openMenu(touch);assert.equal(await touch.locator('.touch-ui').isVisible(),false);
+  await touch.locator('#setting-musicVolume').fill('20');assert.equal(await touch.locator('#musicVolume-value').textContent(),'20%');
   await touch.locator('#setting-timer').check();
   const layout=await touch.locator('#menu').evaluate(el=>({width:el.clientWidth,scroll:el.scrollWidth,left:el.getBoundingClientRect().left,right:el.getBoundingClientRect().right}));
   assert.ok(layout.scroll<=layout.width&&layout.left>=0&&layout.right<=390,'mobile dialog fits without horizontal scrolling');
@@ -117,6 +142,7 @@ try {
   file.on('request',req=>{if(/^https?:/.test(req.url()))network.push(req.url());});
   await file.addInitScript(()=>Object.defineProperty(window,'localStorage',{get(){throw new Error('Storage unavailable');}}));
   await file.goto(pathToFileURL(offline).href);await ready(file);await file.locator('#start').click();
+  await file.waitForFunction(()=>window.testMusicContext()?.state==='running');
   assert.equal(await file.locator('#level-hud').isVisible(),true);assert.equal(await file.locator('#telemetry').isVisible(),false);
   await openMenu(file);await file.locator('#setting-developer').check();await file.locator('#resume-button').click();
   assert.equal(await file.locator('#telemetry').isVisible(),true);assert.deepEqual(network,[],'offline build never requests network assets');

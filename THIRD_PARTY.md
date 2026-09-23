@@ -19,3 +19,5 @@ Three.js npm tarball SHA-256: `ad66d724565ee29a2467277fa84daa5ed0211d6b8d446e9ef
 WASI SDK 25 Linux x86-64 build tool archive SHA-256: `52640dde13599bf127a95499e61d6d640256119456d1af8897ab6725bcf3d89c` (toolchain is not bundled).
 
 Smooth64's original host, level, frontend, tests, and documentation are provided under the MIT license in `LICENSE`. Upstream materials retain their respective notices. Smooth64 is an independent project, not affiliated with Nintendo.
+
+The four compositions in `web/soundtrack.js` and the instrument synthesis in `web/music-synth.js` are original Smooth64 work, also under MIT. They use no third-party recordings, soundfonts, or Nintendo audio. See `docs/SOUNDTRACK.md` for the track list and reproducible WAV export. The CC0 sound-effect sources above are separate from the music.

@@ -16,6 +16,14 @@ The original recovery ZIP is kept in this repository. The folders below contain 
 
 A ROM-free platformer built around the Super Mario 64 US movement code, with an original explorer, a volcanic adventure, and a connected practice playground.
 
+## Version 0.5.0 — quiet trails
+
+Four original, understated pieces add a mellow late-1990s console atmosphere: **Mosslight Path**, **Clouds Beyond the Ridge**, **Embers at Rest**, and **Paper Lantern Sky**. Soft mallets, airy flute, warm keys, and rounded bass leave room for exploring. Each piece runs two minutes, with sparse melodies and long rests.
+
+Tracks shuffle without immediate repeats and blend over twelve seconds. Music starts at a quiet **30%**, softens in menus, keeps playing across world changes and retries, and fades out when the game window loses focus. **Menu → Settings** has a music switch and volume slider, separate from sound effects. Preferences are saved. All four tracks work in the offline HTML without fetching any music assets.
+
+[Soundtrack notes and WAV export](docs/SOUNDTRACK.md) · [Quiet trails release notes](docs/releases/v0.5.0.md)
+
 ## Version 0.4.0 — sound, timed by the movement code
 
 The explorer can be heard now: footsteps, jumps, flips, landings, slides, lava, and every pickup. The original action code already decides *when* a sound plays: a footstep on particular animation frames, one jump sound per takeoff, a whoosh on each flip's spin frames, a scrape for exactly as long as a slide lasts. The core now reports those requests every tick (`s64_sounds`), and the game voices them with CC0 samples, so nothing is guessed from the picture. The walking, running, and tiptoe strides plant a heel on those same frames, so each step sound lands on a footfall.
@@ -158,6 +166,7 @@ npm install --no-save playwright
 npx playwright install chromium
 python3 tools/package_browser.py
 npm run test:browser
+npm run test:music
 ```
 
 The browser check writes review screenshots under `build/browser-checks/`. Set `BROWSER_EXECUTABLE_PATH` to use an existing Chromium executable. Playwright is only needed for this optional check; playing the game and running the movement suite still need no npm packages.
