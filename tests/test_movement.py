@@ -37,6 +37,22 @@ class MovementTests(unittest.TestCase):
         for _ in range(40): peak=max(peak,self.c.tick().position[1])
         self.assertLess(peak,120)
 
+    def test_lava_boost_hurts_and_coins_heal_by_the_wedge(self):
+        # SURFACE_BURNING: check_lava_boost queues 12 hurt units (three wedges).
+        lava=[dict(t,type=1) for t in FLAT]
+        self.c.world(lava);self.c.reset()
+        s=self.c.tick()
+        self.assertEqual(self.name(s),'ACT_LAVA_BOOST')
+        for _ in range(40): s=self.c.tick()
+        self.assertEqual(s.health,0x880-3*0x100)
+        # One coin (4 units) is one wedge, applied by update_mario_health.
+        self.c.heal(8)
+        for _ in range(12): s=self.c.tick()
+        self.assertEqual(s.health,0x880-0x100)
+        self.c.heal(255)
+        for _ in range(80): s=self.c.tick()
+        self.assertEqual(s.health,0x880)  # capped like the original
+
     def test_held_jump_does_not_autohop(self):
         for _ in range(90): s=self.c.tick(buttons=1)
         self.assertEqual(s.position[1],0)

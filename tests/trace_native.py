@@ -10,6 +10,7 @@ core.world(data['triangles'])
 core.reset(data['position'],data['yaw'])
 result=[]
 for frame in data['inputs']:
+    if frame.get('heal'): core.heal(frame['heal'])
     core.tick(frame['x'],frame['y'],frame['buttons'],frame['yaw'])
     result.append(core.raw().hex())
 json.dump(result,sys.stdout)

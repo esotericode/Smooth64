@@ -10,6 +10,7 @@ The host compiles only a subset of libsm64. Its ROM loaders, Mario model/geometr
 4. Run `bhv_mario_update`, which executes the original action groups and collision steps.
 5. Advance the action's animation clock once, without rendering a model.
 6. Publish an 80-byte, fixed-width snapshot. The browser copies the snapshot; it never mutates internal state.
+7. `s64_heal(amount)` is the one gameplay hook. It adds to the character's heal counter, as n64decomp's `interact_coin` does (`4 * coinValue`; 4 units = one wedge). The upstream `update_mario_health` applies it over the following ticks. Objects are not hosted, so the frontend reports coin pickups.
 
 `core/silent_host.c` supplies no-op sound callbacks. `core/kinematics.inc.h` supplies only animation flags/timing and the first three translation channels that physics reads. `tools/import_kinematics.py` regenerates this numerical data from the pinned public source. There is no ROM parser.
 
@@ -40,12 +41,17 @@ This first API is global and not thread-safe. It supports one world and one char
 ## Browser host
 
 - `engine.js`: WASM ABI and fixed-step accumulator; also used directly in Node verification.
-- `world.js`: authored integer triangle geometry, colored render surfaces, destination points.
+- `world.js`: the playground's authored integer triangle geometry, colored render surfaces, destination points.
+- `caldera.js`: Cinder Caldera's geometry, built from integer slabs, columns, blades, annular sectors, and ramps. It uses shared surface types from `rules.js` and defines pickups, checkpoints, and the theme. `caldera-scene.js` adds render-only dressing: sky, embers, lavafalls, grate bars, torches, and titles. `decor.js` holds the playground's floor markings.
+- `rules.js`: shared surface IDs, coin healing amounts, collection radii, power wedges, and knockout/fall detection. Burning and damage stay in the unchanged C core.
+- `level.js`: shared session bookkeeping for **both** worlds, with no Three.js or DOM. It handles coins, shards, stars, checkpoint lighting/travel, respawn, bonus reveal, and the tick-counted timer. Each world owns a session; travel policy allows all playground destinations while Caldera requires reached checkpoints. Pickup events request healing; the host applies it through `s64_heal`. Dead snapshots cannot collect.
+- `settings.js`: validated local settings, with clean defaults and a storage-unavailable fallback. Settings persist; run progress is in memory.
+- `effects.js`: pooled particles (dust, sparks, fire, pickup glitter) triggered by action transitions between consecutive snapshots.
 - `input.js`: keyboard, touch, standard gamepad, camera input. Core A/B/Z edge detection remains inside C.
-- `renderer.js`: Three.js, lighting, follow/orbit camera, camera obstruction ray, optional wireframe/trail, and spark display.
-- `character.js` / `pose.js`: original capsule-and-orb rig and pure procedural pose sampling. Hands, feet, body, and eyes interpolate between simulation snapshots. The camera follows the visible body, including below a ledge. Poses use the action name, animation clock, velocity, and tick; they never write back to the core. They are custom readable illustrations of actions, not the original game's skeletal animations.
+- `renderer.js`: Three.js, per-world themes and loading, an animated lava shader, and a lava underglow baked into vertex colors. Also the follow/orbit camera, whose obstruction rays rise over walls before pulling in; pickups; optional wireframe/trail; and a skippable intro shot.
+- `character.js` / `pose.js`: original capsule-and-orb rig and pure procedural pose sampling. On a live render, a change of action or animation crossfades from the displayed pose over 0.12 s of display time. Direct sampling, which the tests use, stays exact. Hands, feet, body, and eyes interpolate between simulation snapshots. The camera follows the visible body, including below a ledge. Poses use the action name, animation clock, velocity, and tick; they never write back to the core. They are custom readable illustrations of actions, not the original game's skeletal animations.
 - `animations.js` / `tools/export_animations.py`: names and loop bounds generated from the vendored enum and `kinematics.inc.h`, checked in CI. `poses.js` supplies the parallel branch's secondary animation vocabulary; `pose.js` samples it at simulation time and supplies the ledge, locomotion, landing, and attack poses.
-- `progress.js`: session-only spark collection, separate from physics. Uses the visible body center, so a ledge anchor alone cannot collect a spark above the platform.
-- `main.js`: pause/reset/step and HUD, simulation scheduling, recovery.
+- `progress.js`: compatibility adapter for older course tools; delegates to `LevelSession` rather than maintaining separate collection rules. The legacy `world.sparks` array describes the original fifteen coin locations.
+- `main.js`: world/session switching, pause dialogs, settings, the shared HUD, gated developer tools, scheduling, checkpoint transitions, and pickup effects/healing. All modes use one tick/collect/respawn path. Disabling developer tools also clears slow motion, freeze, trails, and mesh.
 
-Normal motion interpolates between the last two core positions. Pausing and stepping show the current state directly. Render interpolation, camera smoothing, squash/tilt, trail, and soft shadow never feed back into collision. Long frame stalls discard wall time rather than executing a backlog of stale controller input. The demo server serves only `web/` and binds localhost by default.
+Normal motion interpolates between the last two core positions. Pausing retains the displayed interpolation/blend; single stepping shows the new snapshot. Contact poses bypass live crossfades so a prior airborne blend cannot pull gloves off a ledge or ceiling. Render interpolation, camera smoothing, squash/tilt, trail, and soft shadow never feed back into collision. Long frame stalls discard wall time rather than executing a backlog of stale controller input. A tick callback returning `false` stops catch-up immediately when a modal opens. Modal and focus changes clear keyboard, touch, and camera deltas; gamepad actions held through a menu must be released before activating again. The demo server serves only `web/` and binds localhost by default.

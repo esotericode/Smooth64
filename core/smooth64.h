@@ -40,6 +40,10 @@ S64_API void s64_tick(int raw_x, int raw_y, unsigned buttons, int camera_yaw);
 S64_API const S64State *s64_state(void);
 S64_API uint32_t s64_state_size(void);
 S64_API float s64_floor_height(float x, float y, float z);
+/* Queue healing the way the original coin interaction does: add to the
+ * character's heal counter (4 units = one health wedge; one coin is 4).
+ * The upstream health update applies it over the next ticks. Clamped to 255. */
+S64_API void s64_heal(int amount);
 
 #ifdef __cplusplus
 }

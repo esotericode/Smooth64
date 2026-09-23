@@ -144,6 +144,17 @@ void s64_tick(int raw_x, int raw_y, unsigned buttons, int camera_yaw) {
     publish_state();
 }
 
+/* n64decomp interact_coin: m->healCounter += 4 * coinValue. Objects are not
+ * hosted, so the frontend reports pickups and the upstream health update
+ * (update_mario_health) applies the counter exactly as for a real coin. */
+void s64_heal(int amount) {
+    if (!ready || amount <= 0) return;
+    global_state_bind(&world);
+    int value = gMarioState->healCounter + amount;
+    gMarioState->healCounter = (u8)(value > 255 ? 255 : value);
+    publish_state();
+}
+
 const S64State *s64_state(void) { return &snapshot; }
 uint32_t s64_state_size(void) { return sizeof(S64State); }
 float s64_floor_height(float x,float y,float z) {
