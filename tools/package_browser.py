@@ -100,6 +100,11 @@ stepping, slow motion, trails and mesh. Your settings are remembered. Each
 world's progress survives switching worlds and checkpoint retries until you
 choose Start this world over or reload.
 
+MUSIC: four original, mellow tracks play in a shuffled order with gentle
+crossfades. Music starts at 30%; Menu > Settings has a separate music switch
+and volume slider. It softens in menus and fades out when you leave the game
+window. World changes and retries keep the music flowing. No downloads needed.
+
 The game pauses when you switch windows. Press P to resume.
 Requires a browser with WebGL 2 and WebAssembly enabled.
 

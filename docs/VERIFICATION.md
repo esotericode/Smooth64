@@ -64,6 +64,14 @@ In Chromium, the MP3 sprite decodes to its exact length with the sync marker in 
 
 Commands are in the README. The cross-compiler test runs the same inputs through the actual native shared library and committed WASM, not a JavaScript rewrite of physics.
 
+## Original soundtrack checks
+
+Version 0.5.0 passes **15 native tests and 57 Node tests**, retaining the movement, sound-effect, input, and presentation coverage above. The five music checks cover complete scores, compatible sparse transition sections, no-repeat shuffle rounds, settings migration and validation, lazy audio allocation, bounded scheduling across multiple tracks, and recovery from a long stall without a burst of overdue notes.
+
+`tools/test_music_browser.mjs` rendered all four complete pieces through Chromium's actual Web Audio graph, including filters, stereo reverb, and envelopes. At full music volume their peaks were 0.199–0.225 and their RMS levels 0.033–0.040; the default 30% setting is a further 10.5 dB quieter. Every one of the twelve possible ordered crossfades was rendered and checked for clipping and silent gaps. The real-time graph was also exercised at the device sample rate, which differs from the 22,050 Hz sample bank; convolution impulses use the device rate.
+
+Real-time checks passed for gesture startup, menu ducking, mute, stopped audio time while suspended, focus loss and return, retained playback on unmute, and rapid repeated toggles without duplicate streams. The integrated browser test passed with both music and the v0.4.0 sound effects: saved music volume and mute, independent effect volume, a single persistent music player through world changes/retries, touch slider layout, and the offline HTML with storage unavailable and no network requests. No JavaScript or WebGL errors were recorded. These are automated render and playback measurements, not a listening session on speakers or headphones.
+
 ## Practical limits
 
 The polish pass was exercised in headless Chromium with software WebGL, including desktop (1280 × 800), touch (390 × 844), and the offline single-file build. The browser regression check passes with no JavaScript or WebGL errors, including storage-unavailable fallback and zero network asset requests in the offline build. Desktop and touch screenshots were inspected. This is automated interaction and visual verification, not a human play session. Gamepad edges are tested with mocked standard-gamepad input; physical gamepad behavior, Firefox/Safari, and performance on target devices still need hands-on verification.

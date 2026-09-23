@@ -95,12 +95,12 @@ test('a modal opened during catch-up stops further simulation ticks',()=>{
 
 test('settings default to clean play, validate saved values, and survive unavailable storage',()=>{
   let value=null;const storage={getItem:()=>value,setItem:(_key,next)=>value=next};
-  assert.deepEqual(loadSettings(storage),{developer:false,hints:true,timer:false,volume:.8,deadzone:.15});
+  assert.deepEqual(loadSettings(storage),DEFAULT_SETTINGS);
   saveSettings({...DEFAULT_SETTINGS,developer:true,timer:true,volume:.35,deadzone:.2},storage);
   assert.equal(loadSettings(storage).developer,true);assert.equal(loadSettings(storage).timer,true);
   assert.equal(loadSettings(storage).volume,.35);assert.equal(loadSettings(storage).deadzone,.2);
   value='{"developer":"true","hints":false,"timer":7,"volume":"loud","deadzone":0.9,"obsolete":true}';
-  assert.deepEqual(loadSettings(storage),{developer:false,hints:false,timer:false,volume:.8,deadzone:.35});
+  assert.deepEqual(loadSettings(storage),{...DEFAULT_SETTINGS,hints:false,deadzone:.35});
   value='{"volume":-2,"deadzone":null}';
   assert.deepEqual(loadSettings(storage),{...DEFAULT_SETTINGS,volume:0});
   value='not json';assert.deepEqual(loadSettings(storage),DEFAULT_SETTINGS);
