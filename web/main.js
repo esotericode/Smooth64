@@ -5,13 +5,19 @@ import {loadCore,FixedClock} from './engine.js';
 import {Input} from './input.js';
 import {PlaygroundRenderer} from './renderer.js';
 import {LevelSession,formatTime} from './level.js';
-import {healthWedges,respawnReason} from './rules.js';
-import {loadSettings,saveSettings} from './settings.js';
+import {HEALTH,healthWedges,respawnReason} from './rules.js';
+import {loadSettings,saveSettings,SETTING_RANGES} from './settings.js';
 import {actionCue} from './pose.js';
+import {GameAudio} from './audio.js';
 
 const $=id=>document.getElementById(id);
 const canvas=$('game'),menu=$('menu'),help=$('help'),victory=$('victory');
-const clock=new FixedClock(),settings=loadSettings();
+const clock=new FixedClock(),settings=loadSettings(),audio=new GameAudio({volume:settings.volume});
+// Sounds are optional: the game starts without them if the file is missing.
+fetch('sounds.mp3').then(response=>response.ok?response.arrayBuffer():null).then(bytes=>bytes&&audio.load(bytes)).catch(()=>{});
+// Browsers let a page start audio only after a click, tap or key press.
+for(const type of ['pointerdown','keydown','touchend'])window.addEventListener(type,()=>audio.unlock(),{capture:true,passive:true});
+let previewTimer=0;
 let core,renderer,input,previous,current,actions,worlds,sessions,world,session,mode;
 let started=false,debugPaused=false,slow=false,last=0,frames=0,frameTime=0,renderAlpha=1;
 let lastInput={x:0,y:0,buttons:0,yaw:0},toastTimer,respawning=0,meterWedges=-1;
@@ -30,10 +36,11 @@ function syncInput() {
   $('freeze-button').setAttribute('aria-pressed',debugPaused);
   write('freeze-button',debugPaused?'Unfreeze':'Freeze');
 }
-function syncPause() {clock.reset();input?.clear();syncInput();}
+function syncPause() {clock.reset();input?.clear();audio.hush();syncInput();}
 function cancelRespawn() {respawning=0;$('fade').hidden=true;}
 function place(zone,{keepFade=false}={}) {
   if(!keepFade)cancelRespawn();
+  audio.hush();
   current=core.reset(zone.position,zone.yaw);previous=current;renderAlpha=1;
   clock.reset();input.clear();lastInput={x:0,y:0,buttons:0,yaw:0};
   renderer.reset(zone.position,zone.camera,zone.pitch);syncInput();renderHud();
@@ -65,7 +72,7 @@ function setMode(next) {
 }
 function start(next='caldera') {
   if(!core||started)return;
-  started=true;document.body.classList.add('playing');$('welcome').hidden=true;renderer.intro=false;
+  started=true;document.body.classList.add('playing');$('welcome').hidden=true;renderer.intro=false;audio.unlock();
   if(next!==mode)setMode(next);else reset();
   for(const id of ['menu-button','level-hud','location'])$(id).hidden=false;
   applySettings();
@@ -75,7 +82,7 @@ function start(next='caldera') {
 }
 function openMenu() {
   if(!started||modalOpen())return;
-  renderMenu();menu.showModal();syncPause();
+  renderMenu();menu.showModal();syncPause();audio.cue('click');
 }
 function openHelp() {if(help.open||victory.open)return;help.showModal();syncPause();}
 function restartWorld() {
@@ -86,7 +93,11 @@ function restartWorld() {
 }
 function applySettings() {
   document.body.classList.toggle('developer',settings.developer);
-  for(const key of Object.keys(settings))$(`setting-${key}`).checked=settings[key];
+  for(const [key,value] of Object.entries(settings)) {
+    if(!SETTING_RANGES[key]){$(`setting-${key}`).checked=value;continue;}
+    $(`setting-${key}`).value=Math.round(value*100);write(`${key}-value`,`${Math.round(value*100)}%`);
+  }
+  audio.setVolume(settings.volume);if(input)input.deadzone=settings.deadzone;
   for(const id of ['telemetry','toolbar','render-stats'])$(id).hidden=!started||!settings.developer;
   $('technical-guide').hidden=!settings.developer;$('timer-hud').hidden=!settings.timer;
   if(!settings.developer) {
@@ -101,12 +112,19 @@ function applySettings() {
 }
 function respawn(message) {
   if(respawning)return;
+  audio.hush();if(current.health<HEALTH.ALIVE)audio.cue('lose');
   respawning=18;write('fade-text',message);const fade=$('fade');fade.hidden=false;
   fade.style.animation='none';void fade.offsetWidth;fade.style.animation='';syncInput();
 }
 $('fade').addEventListener('animationend',()=>$('fade').hidden=true);
 function collectEvents(events) {
   let victoryKind=null;
+  // One sound per kind per tick, however many pickups it collected.
+  for(const type of new Set(events.map(event=>event.type))) {
+    if(type==='checkpoint')audio.cue(events.some(event=>event.first)?'checkpoint':'beacon');
+    else if(type==='reveal')audio.cue('reveal',{delay:.75});
+    else audio.cue(type==='bonus'?'star':type);
+  }
   for(const event of events) {
     const p=event.pickup?.position;
     if(event.heal)current=core.heal(event.heal);
@@ -160,6 +178,7 @@ function tick() {
   lastInput=input.sample(renderer.yaw);previous=current;
   if(renderer.shot&&(lastInput.buttons||Math.hypot(lastInput.x,lastInput.y)>7))renderer.shot=null;
   current=core.tick(lastInput);renderer.record(current);renderer.tick(previous,current,actions[previous.action],actionName());
+  audio.tick(core.sounds(),previous,current,actions[previous.action],actionName());
   session.tick(lastInput);
   const reason=respawnReason(current);
   if(reason)respawn(reason);else collectEvents(session.collect(current,actionName()));
@@ -243,6 +262,7 @@ function renderHud() {
 }
 function frame(now) {
   const dt=Math.min((now-last)/1000||0,.1);last=now;input.pollCommands();
+  if(paused()||respawning)audio.hush();
   if(started&&!modalOpen()) {
     const delta=input.cameraDelta(dt);renderer.yaw+=delta.yaw;
     renderer.pitch=Math.max(.12,Math.min(1.25,renderer.pitch+delta.pitch));
@@ -270,7 +290,7 @@ $('close-menu').addEventListener('click',()=>menu.close());
 $('resume-button').addEventListener('click',()=>{debugPaused=false;menu.close();});
 $('help-button').addEventListener('click',openHelp);$('menu-help').addEventListener('click',openHelp);
 $('close-help').addEventListener('click',()=>help.close());$('help-done').addEventListener('click',()=>help.close());
-for(const dialog of [menu,help,victory])dialog.addEventListener('close',()=>{syncPause();if(!modalOpen()&&started)canvas.focus();});
+for(const dialog of [menu,help,victory])dialog.addEventListener('close',()=>{syncPause();if(!modalOpen()&&started){audio.cue('click');canvas.focus();}});
 $('victory-continue').addEventListener('click',()=>victory.close());
 $('victory-restart').addEventListener('click',restartWorld);$('restart-world').addEventListener('click',restartWorld);
 $('reset-button').addEventListener('click',()=>{reset();menu.close();toast('Back at your checkpoint.');});
@@ -279,8 +299,10 @@ $('step-button').addEventListener('click',()=>{step();canvas.focus();});
 $('slow-button').addEventListener('click',()=>{slow=!slow;applySettings();canvas.focus();});
 $('wire-button').addEventListener('click',()=>{renderer.wire.visible=!renderer.wire.visible;applySettings();canvas.focus();});
 $('trail-button').addEventListener('click',()=>{renderer.trail.visible=!renderer.trail.visible;applySettings();canvas.focus();});
-for(const key of Object.keys(settings))$(`setting-${key}`).addEventListener('change',e=>{
-  settings[key]=e.target.checked;saveSettings(settings);applySettings();
+for(const key of Object.keys(settings))$(`setting-${key}`).addEventListener(SETTING_RANGES[key]?'input':'change',e=>{
+  settings[key]=SETTING_RANGES[key]?Number(e.target.value)/100:e.target.checked;saveSettings(settings);applySettings();
+  // Let the new volume be heard while dragging, without a burst of coins.
+  if(key==='volume'&&performance.now()>previewTimer){previewTimer=performance.now()+180;audio.unlock();audio.cue('coin');}
 });
 for(const button of document.querySelectorAll('[data-mode]'))button.addEventListener('click',()=>{
   if(button.dataset.mode!==mode){setMode(button.dataset.mode);toast(`Welcome back to ${world.name}.`);}

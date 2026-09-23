@@ -44,6 +44,15 @@ S64_API float s64_floor_height(float x, float y, float z);
  * character's heal counter (4 units = one health wedge; one coin is 4).
  * The upstream health update applies it over the next ticks. Clamped to 255. */
 S64_API void s64_heal(int amount);
+/* Sound requests made by the original actions during the last s64_tick, in
+ * call order, as upstream 32-bit sound IDs: bank << 28 | ID << 16 | priority
+ * << 8 | flags. Step, jump and landing IDs include the floor's terrain offset.
+ * Continuous (bank 1) sounds repeat on every tick they should keep playing.
+ * The core plays nothing; the caller voices IDs with its own samples. At most
+ * S64_MAX_SOUNDS per tick; valid until the next core operation. */
+enum { S64_MAX_SOUNDS = 16 };
+S64_API uint32_t s64_sound_count(void);
+S64_API const uint32_t *s64_sounds(void);
 
 #ifdef __cplusplus
 }

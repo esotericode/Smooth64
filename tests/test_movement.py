@@ -157,5 +157,24 @@ class MovementTests(unittest.TestCase):
         self.assertEqual(self.c.lib.s64_reset(float('nan'),0,0,0),-1)
         self.assertEqual(self.c.lib.s64_reset(7000,0,7000,0),-1)
 
+    def test_sound_requests_are_the_original_ids_once_per_tick(self):
+        # audio_defines.h: TERRAIN_JUMP, YAH_WAH_HOO, TERRAIN_LANDING, TERRAIN_STEP.
+        jump,hup,land,step=0x04008081,0x24008081,0x04088081,0x06108081
+        self.c.tick(buttons=1)
+        self.assertEqual(self.c.sounds(),[jump,hup])
+        self.c.tick(buttons=1)
+        self.assertEqual(self.c.sounds(),[],'played once, then cleared by the next tick')
+        heard=[]
+        for _ in range(30): self.c.tick();heard+=self.c.sounds()
+        self.assertEqual(heard,[land])
+        self.c.reset();self.assertEqual(self.c.sounds(),[])
+        steps=[]
+        for i in range(40):
+            s=self.c.tick(y=80)
+            if self.c.sounds()==[step]: steps.append(i)
+        # Running steps on RUNNING's frames 9 and 45: twice per 72-frame loop.
+        self.assertGreaterEqual(len(steps),8)
+        self.assertTrue(all(3<=b-a<=6 for a,b in zip(steps,steps[1:])))
+
 
 if __name__=='__main__':unittest.main()

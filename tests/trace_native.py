@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""JSON in, exact state bytes per tick out. Used for cross-compiler parity."""
+"""JSON in, exact state bytes per tick out. Used for cross-compiler parity.
+
+With "sounds": true, each tick is {"state": hex, "sounds": [sound IDs]}."""
 import json
 import sys
 from native import Native
@@ -12,5 +14,5 @@ result=[]
 for frame in data['inputs']:
     if frame.get('heal'): core.heal(frame['heal'])
     core.tick(frame['x'],frame['y'],frame['buttons'],frame['yaw'])
-    result.append(core.raw().hex())
+    result.append({'state':core.raw().hex(),'sounds':core.sounds()} if data.get('sounds') else core.raw().hex())
 json.dump(result,sys.stdout)

@@ -8,6 +8,10 @@ const clamp=x=>Math.max(0,Math.min(1,x));
 const smooth=x=>{x=clamp(x);return x*x*(3-2*x);};
 const mix=(a,b,t)=>a+(b-a)*t;
 const blend=(a,b,t)=>a.map((v,i)=>mix(v,b[i],t));
+// The frame of each gait's first footstep sound in the original
+// (mario_actions_moving.c, play_step_sound); the second is half a loop later.
+// The stride plants a heel on both, so every step sound lands on a footfall.
+export const FIRST_STEP=Object.freeze({WALKING:10,RUNNING:9,TIPTOE:14,START_TIPTOE:7});
 
 // Rig-space point -> pivot-space point for a pose with a pitch-only rotation.
 // Lets a leaning body keep a foot or glove planted where the world needs it.
@@ -204,7 +208,9 @@ export function poseFor(s,name='ACT_IDLE') {
       p.footPitch=[mix(-.4,-.15,falling),mix(-.35,0,falling)];
     } else secondaryAir(p,s,anim,name);
   } else if(name.includes('WALK')||name.includes('DECELERATING')||Math.abs(s.speed)>2) {
-    const stride=Math.sin(cycle)*(s.speed<0?-1:1),lift=Math.cos(cycle);
+    // Left heel strikes at a quarter cycle, the right three quarters in.
+    const step=FIRST_STEP[anim],gait=step===undefined?cycle:cycle+(.25-(step-timing[0])/Math.max(1,timing[1]-timing[0]))*TAU;
+    const stride=Math.sin(gait)*(s.speed<0?-1:1),lift=Math.cos(gait);
     p.root[1]+=Math.abs(stride)*3*speed;p.rotation[0]=speed*.13;
     p.hands=[[-48,9,-stride*29*speed],[48,9,stride*29*speed]];
     // Place the stance sole on the ground even while the torso leans/bobs.

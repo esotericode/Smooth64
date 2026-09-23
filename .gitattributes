@@ -3,3 +3,5 @@ web/vendor/** -text linguist-vendored
 core/kinematics.inc.h -text linguist-generated
 web/actions.json linguist-generated
 *.wasm binary linguist-generated
+web/sounds.js linguist-generated
+*.mp3 binary

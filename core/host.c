@@ -10,6 +10,7 @@
 #include "decomp/game/mario.h"
 #include "decomp/game/object_stuff.h"
 #include "load_surfaces.h"
+#include "sound_log.h"
 #include "kinematics.inc.h"
 
 _Static_assert(sizeof(S64State) == 80, "Public WASM/native ABI changed");
@@ -72,6 +73,7 @@ int s64_commit_surfaces(void) {
 
 int s64_reset(float x, float y, float z, int face_yaw) {
     ready = 0;
+    s64_sound_log_count = 0;
     if (!isfinite(x) || !isfinite(y) || !isfinite(z) ||
         fabsf(x)>32767 || fabsf(y)>32767 || fabsf(z)>32767) return -1;
     memset(&world, 0, sizeof(world));
@@ -122,6 +124,7 @@ static void adjust_stick(int x, int y) {
 }
 
 void s64_tick(int raw_x, int raw_y, unsigned buttons, int camera_yaw) {
+    s64_sound_log_count = 0;
     if (!ready) return;
     global_state_bind(&world);
     u16 down = ((buttons & S64_A) ? A_BUTTON : 0) |
@@ -157,6 +160,8 @@ void s64_heal(int amount) {
 
 const S64State *s64_state(void) { return &snapshot; }
 uint32_t s64_state_size(void) { return sizeof(S64State); }
+uint32_t s64_sound_count(void) { return s64_sound_log_count; }
+const uint32_t *s64_sounds(void) { return s64_sound_log; }
 float s64_floor_height(float x,float y,float z) {
     struct SM64SurfaceCollisionData *floor;
     return find_floor(x,y,z,&floor);

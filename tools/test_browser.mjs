@@ -13,7 +13,7 @@ const server=createServer((req,res)=>{
   if(!file.startsWith(web+path.sep)){res.writeHead(403);res.end();return;}
   try {
     const data=readFileSync(file),ext=path.extname(file);
-    res.setHeader('Content-Type',({'.js':'text/javascript','.wasm':'application/wasm','.css':'text/css','.html':'text/html','.json':'application/json'})[ext]||'application/octet-stream');res.end(data);
+    res.setHeader('Content-Type',({'.js':'text/javascript','.wasm':'application/wasm','.css':'text/css','.html':'text/html','.json':'application/json','.mp3':'audio/mpeg'})[ext]||'application/octet-stream');res.end(data);
   } catch {res.writeHead(404);res.end();}
 });
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -36,13 +36,22 @@ const destination=async(page,index)=>{await openMenu(page);await page.locator('#
 const count=async page=>Number(await page.locator('#coin-count').textContent());
 try {
   const page=await pageFor({viewport:{width:1280,height:800}});
+  // Record each sample the game starts (by duration) without changing the game.
+  await page.addInitScript(()=>{
+    window.__sounds=[];const start=AudioBufferSourceNode.prototype.start;
+    AudioBufferSourceNode.prototype.start=function(...args){window.__sounds.push(Math.round(this.buffer.duration*1000));return start.apply(this,args);};
+  });
   await page.goto(url);await ready(page);
   await page.screenshot({path:path.join(out,'welcome.png')});
   await page.keyboard.press('Space');await page.locator('#level-hud').waitFor();
   assert.equal(await page.locator('#telemetry').isVisible(),false);assert.equal(await page.locator('#toolbar').isVisible(),false);
   assert.equal(await page.locator('#timer-hud').isVisible(),false);
+  const {SAMPLES}=await import(pathToFileURL(path.join(web,'sounds.js')).href);
+  const ms=name=>Math.round(SAMPLES[name][1]*1000),steps=['step1','step2','step3','step4','step5','step6'].map(ms);
   await page.keyboard.down('a');
   await page.waitForFunction(()=>Number(document.getElementById('coin-count').textContent)>0);
+  // Running plays the core's footsteps; the pickup chimes.
+  await page.waitForFunction(([steps,coin])=>window.__sounds.filter(d=>steps.includes(d)).length>=2&&window.__sounds.includes(coin),[steps,ms('coin')]);
   await page.keyboard.up('a');let savedCoins=await count(page);
   await page.screenshot({path:path.join(out,'caldera.png')});
   await openMenu(page);await page.locator('#setting-developer').check();await page.locator('#setting-timer').check();
@@ -62,7 +71,7 @@ try {
   for(const id of ['freeze-button','slow-button','wire-button','trail-button'])assert.equal(await page.locator('#'+id).getAttribute('aria-pressed'),'false');
   const time=await page.locator('#level-time').textContent();await page.keyboard.press('n');
   await page.waitForFunction(before=>document.getElementById('level-time').textContent!==before,time);
-  console.log('PASS clean defaults, modal input, nested help, developer gating, pause and exact stepping');
+  console.log('PASS clean defaults, footstep and pickup sounds, modal input, nested help, developer gating, pause and exact stepping');
 
   await openMenu(page);savedCoins=await count(page);await page.locator('[data-mode="playground"]').click();assert.equal(await count(page),0);assert.equal(await page.locator('#shards-hud').isVisible(),false);
   assert.equal(await page.locator('#power-meter').isVisible(),true);
@@ -77,11 +86,14 @@ try {
   assert.match(await page.locator('#checkpoint-name').textContent(),/runway/);
   await world(page,'caldera');assert.equal(await count(page),savedCoins,'restarting practice leaves the adventure intact');
   await openMenu(page);await page.locator('#setting-developer').check();
+  await page.locator('#setting-volume').fill('35');await page.locator('#setting-deadzone').fill('22');
+  assert.equal(await page.locator('#volume-value').textContent(),'35%');
   await page.reload();await ready(page);await page.locator('#start').click();assert.equal(await page.locator('#telemetry').isVisible(),true);
   await openMenu(page);assert.equal(await page.locator('#setting-developer').isChecked(),true);
+  assert.equal(await page.locator('#setting-volume').inputValue(),'35');assert.equal(await page.locator('#deadzone-value').textContent(),'22%');
   await page.locator('#setting-developer').uncheck();await page.locator('#resume-button').click();
   await page.screenshot({path:path.join(out,'playground.png')});
-  console.log('PASS world switching, preserved pickups/checkpoints, independent restart and saved settings');
+  console.log('PASS world switching, preserved pickups/checkpoints, independent restart and saved settings, volume and dead zone');
   await page.context().browser().close();
 
   const touch=await pageFor({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:1});

@@ -20,6 +20,8 @@ class Native:
         self.lib.s64_state.restype = C.POINTER(State)
         self.lib.s64_floor_height.argtypes = [C.c_float]*3
         self.lib.s64_floor_height.restype = C.c_float
+        self.lib.s64_sounds.restype = C.POINTER(C.c_uint32)
+        self.lib.s64_sound_count.restype = C.c_uint32
 
     def world(self, triangles):
         self.lib.s64_clear_surfaces()
@@ -47,6 +49,10 @@ class Native:
     def tick(self, x=0, y=0, buttons=0, yaw=0):
         self.lib.s64_tick(x,y,buttons,yaw)
         return self.state()
+
+    def sounds(self):
+        log = self.lib.s64_sounds()
+        return [log[i] for i in range(self.lib.s64_sound_count())]
 
 
 FLAT = [

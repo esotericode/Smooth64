@@ -39,6 +39,8 @@ export async function loadCore(bytes) {
     floor(x,y,z) { return api.s64_floor_height(x,y,z); },
     // Coins: 4 = one wedge, queued like the original coin interaction.
     heal(amount) { api.s64_heal(amount); return this.state(); },
+    // Upstream sound IDs the actions requested during the last tick.
+    sounds() { return Array.from(new Uint32Array(memory.buffer,api.s64_sounds(),api.s64_sound_count())); },
     stateBytes() { return new Uint8Array(memory.buffer,statePointer,80).slice(); },
     state() {
       const f=new Float32Array(memory.buffer,statePointer,20);
