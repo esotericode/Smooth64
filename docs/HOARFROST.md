@@ -143,7 +143,9 @@ Work in this order. Keep the tests green after each step (`npm test`).
 2. **Geometry** in `web/hoarfrost.js`: remove the snowbank; add sections 7–11 inside the reserved areas; flatten the apex; add the checkpoints `falls`, `ridge` and `summit` to `checkpoints` (menu order); extend `route`; add shards `shard-falls`, `shard-vane` and `shard-tip`, the `aurora-star` and the `polar-star` bonus; add ~35 coins, each with the section of its checkpoint, to reach 100. Replace `PART1_BUDGET` with a whole-level budget (≤ 4,000), and remove or refresh `reserved`.
 3. **Goal and copy**: set `goal:'aurora-star'`. Rewrite `text`: objectives Icefall Star, Aurora Star, Frost Shards (8), and Polar Star (`needsShards:true`); `reveal`; and `victory(kind,{session,shards,best,pickup})`, branching on `pickup.id` for each star. Update the welcome button subtitle in `web/index.html` (e.g. "3 stars to claim · 8 shards to discover"), the Hoarfrost paragraph in the help dialog, and the guide in `tools/package_browser.py`.
 4. **Dressing** in `web/hoarfrost-scene.js`: ice curtain and icicles, wind streaks, summit cairn and flag, luge banners; remove the snowed-in board; move the Polar Star outline. Check the look with `tools/level_shots.mjs`.
-5. **Audio**: the `wind` bed for `SOUND_ENV_WIND2`, plus a test.
+5. **Audio**: the `wind` bed for `SOUND_ENV_WIND2`, plus a test. Two polish items left from part 1:
+   - Frostbite water still voices the lava `scorch` cue and the crackling `burn` bed (only the particles are frost-coloured). Give the theme an audio hazard (a splash and an icy fizz) that `audio.js` can switch to.
+   - Footsteps sound like grass, because the host fixes the area's terrain type. A presentation-only remap in `audio.js` (grass → snow, stone → ice in this world) would make them crunch.
 6. **Tests** in `tests/hoarfrost.test.mjs`:
    - update the counts (8 shards, 2 stars, 1 bonus, 9 checkpoints, ≥ 95 coins, < 4,096 triangles);
    - replace "part 2 stays sealed" with route proofs for the falls, ridge (including the wind's drift) and summit, plus the Avalanche Run;
