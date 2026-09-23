@@ -95,7 +95,8 @@ function applySettings() {
   document.body.classList.toggle('developer',settings.developer);
   for(const [key,value] of Object.entries(settings)) {
     if(!SETTING_RANGES[key]){$(`setting-${key}`).checked=value;continue;}
-    $(`setting-${key}`).value=Math.round(value*100);write(`${key}-value`,`${Math.round(value*100)}%`);
+    const label=key==='music'&&value===0?'Off':`${Math.round(value*100)}%`;
+    $(`setting-${key}`).value=Math.round(value*100);write(`${key}-value`,label);$(`setting-${key}`).setAttribute('aria-valuetext',label);
   }
   audio.setVolume(settings.volume);audio.setMusicVolume(settings.music);if(input)input.deadzone=settings.deadzone;
   for(const id of ['telemetry','toolbar','render-stats'])$(id).hidden=!started||!settings.developer;

@@ -6,6 +6,8 @@ export function loadSettings(storage) {
   try {
     storage??=globalThis.localStorage;
     const saved=JSON.parse(storage.getItem(KEY)||'{}');
+    // v0.5.0 saved music as a switch plus musicVolume. A player who silenced it stays silent.
+    if(typeof saved?.music==='boolean')saved.music=saved.music&&saved.musicVolume!==0?undefined:0;
     return Object.fromEntries(Object.entries(DEFAULT_SETTINGS).map(([key,value])=>{
       const next=saved?.[key],range=SETTING_RANGES[key];
       if(range)return [key,Number.isFinite(next)?Math.max(range[0],Math.min(range[1],next)):value];

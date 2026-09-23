@@ -95,7 +95,8 @@ try {
   await page.locator('#setting-volume').fill('35');await page.locator('#setting-deadzone').fill('22');
   assert.equal(await page.locator('#volume-value').textContent(),'35%');
   // Music at 0% stops scheduling notes.
-  await page.locator('#setting-music').fill('0');assert.equal(await page.locator('#music-value').textContent(),'0%');
+  await page.locator('#setting-music').fill('0');assert.equal(await page.locator('#music-value').textContent(),'Off');
+  assert.equal(await page.locator('#setting-music').getAttribute('aria-valuetext'),'Off');
   await page.waitForTimeout(600);const quiet=await page.evaluate(()=>window.__notes);await page.waitForTimeout(1500);
   assert.equal(await page.evaluate(()=>window.__notes),quiet,'no music at 0%');
   await page.reload();await ready(page);await page.locator('#start').click();assert.equal(await page.locator('#telemetry').isVisible(),true);

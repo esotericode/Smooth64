@@ -22,6 +22,8 @@ Four original tracks play quietly in the background, in the spirit of late-'90s 
 
 Tracks come from a shuffle bag: all four play before any repeats, never the same one twice in a row. Each track opens and closes sparsely and ends on a ringing chord. The next one starts over that chord, in whichever nearby key shares the most notes with it, so the music drifts from one piece to the next without a gap. Menus muffle it, the shard and star jingles briefly duck it, and it pauses while the tab is hidden. **Menu → Settings → Music** sets its volume: 50% by default, well under the sound effects; 0% turns it off.
 
+[Soundtrack notes: the tracks, editing the scores, and rendering them](docs/SOUNDTRACK.md)
+
 ## Version 0.4.0 — sound, timed by the movement code
 
 The explorer can be heard now: footsteps, jumps, flips, landings, slides, lava, and every pickup. The original action code already decides *when* a sound plays: a footstep on particular animation frames, one jump sound per takeoff, a whoosh on each flip's spin frames, a scrape for exactly as long as a slide lasts. The core now reports those requests every tick (`s64_sounds`), and the game voices them with CC0 samples, so nothing is guessed from the picture. The walking, running, and tiptoe strides plant a heel on those same frames, so each step sound lands on a footfall.

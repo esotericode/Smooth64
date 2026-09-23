@@ -103,6 +103,10 @@ test('settings default to clean play, validate saved values, and survive unavail
   assert.deepEqual(loadSettings(storage),{developer:false,hints:false,timer:false,volume:.8,music:.5,deadzone:.35});
   value='{"volume":-2,"music":3,"deadzone":null}';
   assert.deepEqual(loadSettings(storage),{...DEFAULT_SETTINGS,volume:0,music:1});
+  // v0.5.0's music switch and musicVolume: silence carries over, anything else starts at the default.
+  for(const [saved,music] of [['{"music":false,"musicVolume":0.3}',0],['{"music":true,"musicVolume":0}',0],['{"music":true,"musicVolume":0.6}',.5]]) {
+    value=saved;assert.deepEqual(loadSettings(storage),{...DEFAULT_SETTINGS,music});
+  }
   value='not json';assert.deepEqual(loadSettings(storage),DEFAULT_SETTINGS);
   const blocked={getItem(){throw Error('blocked');},setItem(){throw Error('blocked');}};
   assert.deepEqual(loadSettings(blocked),DEFAULT_SETTINGS);assert.doesNotThrow(()=>saveSettings(DEFAULT_SETTINGS,blocked));
