@@ -25,9 +25,10 @@ def package():
     BUILD.mkdir(exist_ok=True)
     DIST.mkdir(exist_ok=True)
     source = (WEB / "main.js").read_text()
-    # Only the two exact startup asset requests change. Three.js and all game
+    # Only the exact startup asset requests change. Three.js and all game
     # modules are bundled by esbuild; there are no network requests at runtime.
-    for name, mime in [("smooth64.wasm", "application/wasm"), ("actions.json", "application/json")]:
+    for name, mime in [("smooth64.wasm", "application/wasm"), ("actions.json", "application/json"),
+                       ("sounds.mp3", "audio/mpeg")]:
         request = f"fetch('{name}')"
         if source.count(request) != 1:
             raise RuntimeError(f"Expected exactly one startup request for {name}")
@@ -71,6 +72,10 @@ WASD / arrow keys: move    Space: jump    Shift: crouch    J: attack/dive
 Drag the view: camera     R: checkpoint  Controls button: full move guide
 Escape / P: pause menu    Gamepad Start: pause menu
 
+SOUND: starts after your first click or key press. Menu > Settings > Sound
+effects sets the volume. If a gamepad stick drifts, raise Menu > Settings >
+Stick dead zone (15% by default).
+
 Long jump: run, press Shift, then Space.
 Backflip: stand still, hold Shift, then Space.
 Double/triple jump: jump again just after landing; run for the third jump.
@@ -89,10 +94,11 @@ healing coins across the original courses and trails. Menu > Practice destinatio
 opens every area. Power, coins, lava and checkpoint recovery work as in the level.
 
 SETTINGS: the default view shows your power and collectibles. Open Menu for
-destinations, objectives, movement hints and the optional timer. Enable Developer
-tools for action/velocity readouts, frame stepping, slow motion, trails and mesh.
-Your settings are remembered. Each world's progress survives switching worlds
-and checkpoint retries until you choose Start this world over or reload.
+destinations, objectives, sound volume, the stick dead zone, movement hints and
+the optional timer. Enable Developer tools for action/velocity readouts, frame
+stepping, slow motion, trails and mesh. Your settings are remembered. Each
+world's progress survives switching worlds and checkpoint retries until you
+choose Start this world over or reload.
 
 The game pauses when you switch windows. Press P to resume.
 Requires a browser with WebGL 2 and WebAssembly enabled.

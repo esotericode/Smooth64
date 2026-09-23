@@ -9,12 +9,24 @@
 2. Double-click **Smooth64-Play.html**.
 3. Click **Cinder Caldera** for the level, or **Movement playground** for the test areas.
 
-Works offline in Edge, Chrome, or Firefox. No installation, Python, terminal, compiler, or ROM required. **WASD** moves, **Space** jumps, **Shift** crouches, **J** attacks.
+Works offline in Edge, Chrome, or Firefox. No installation, Python, terminal, compiler, or ROM required. **WASD** moves, **Space** jumps, **Shift** crouches, **J** attacks. Sound starts after your first click or key press.
 
 The original recovery ZIP is kept in this repository. The folders below contain the editable project source.
 
 
 A ROM-free platformer built around the Super Mario 64 US movement code, with an original explorer, a volcanic adventure, and a connected practice playground.
+
+## Version 0.4.0 — sound, timed by the movement code
+
+The explorer can be heard now: footsteps, jumps, flips, landings, slides, lava, and every pickup. The original action code already decides *when* a sound plays: a footstep on particular animation frames, one jump sound per takeoff, a whoosh on each flip's spin frames, a scrape for exactly as long as a slide lasts. The core now reports those requests every tick (`s64_sounds`), and the game voices them with CC0 samples, so nothing is guessed from the picture. The walking, running, and tiptoe strides plant a heel on those same frames, so each step sound lands on a footfall.
+
+You'll hear soft footsteps at a walk, a push-off and a little "hup" on each jump (rising for double and triple jumps), spin whooshes, soft landings and heavy ground-pound impacts, braking and sliding scrapes, a wall tap to time wall kicks against, gloves catching ledges and clinking along grates, a yelp and crackle in lava, and a whistle on long falls. Coins chime, Ember Shards and stars get their own jingles, beacons whoosh alight, and a secret jingle announces the Crimson Star. **Menu → Settings → Sound effects** sets the volume; 0 mutes.
+
+Every sample is **CC0** from [Kenney](https://kenney.nl) (his official starter kits and the Kenney set in Python Arcade); the slide and lava textures are generated in code. No Nintendo audio is used. See [Sources and licenses](THIRD_PARTY.md).
+
+Gamepad sticks now have a **15% scaled radial dead zone** (the SM64 PC port's default), for movement and camera alike. A drifting stick no longer walks the explorer, turns the camera, starts the timer, or skips the intro shot, and the travel beyond the zone is rescaled so the first movement past it is still the gentlest tiptoe. **Menu → Settings → Stick dead zone** adjusts it between 5% and 35%.
+
+[Sound release notes](docs/releases/v0.4.0.md)
 
 ## Version 0.3.1 — one set of rules, a quieter screen
 
@@ -91,8 +103,9 @@ The playground contains a runway, walkable ramps, a steep slippery slope, a wall
 | Quarter speed (developer tools) | T | On-screen button |
 | Collision mesh (developer tools) | V | On-screen button |
 | Move guide | ? or H | Controls button |
+| Sound volume, stick dead zone | Menu → Settings | Start → Settings |
 
-Touch devices get an analog pad and A/B/Z buttons. Keyboard buttons retain very short taps until the next simulation tick. Gamepad input is sampled on simulation ticks. Losing window focus pauses the simulation and clears keyboard input.
+Touch devices get an analog pad and A/B/Z buttons. Keyboard buttons retain very short taps until the next simulation tick. Gamepad input is sampled on simulation ticks, with a 15% radial dead zone on both sticks. Losing window focus pauses the simulation and clears keyboard input.
 
 ## Moves
 
@@ -119,7 +132,7 @@ docs/               Fidelity, architecture, and verification notes
 
 The renderer uses Three.js only to draw. It does not provide character physics. Collision and visible geometry are generated from the same integer-coordinate triangle list. The C core advances at exactly **30 Hz**; the display interpolates positions independently. Animation clocks also advance at simulation rate even though no original character model is drawn.
 
-`core/smooth64.h` is the engine integration boundary. Besides world loading and ticking, it has one gameplay hook: `s64_heal`, which queues health the way the original coin interaction does. The same C code can be linked into a raylib/SDL/custom native host; WebAssembly is just the first frontend. This initial API is deliberately **single-world, single-character, static geometry**.
+`core/smooth64.h` is the engine integration boundary. Besides world loading and ticking, it has one gameplay hook: `s64_heal`, which queues health the way the original coin interaction does. `s64_sounds` reports the original sound IDs the actions requested during the last tick; the core itself plays nothing, and each host voices the IDs with its own samples. The same C code can be linked into a raylib/SDL/custom native host; WebAssembly is just the first frontend. This initial API is deliberately **single-world, single-character, static geometry**.
 
 ## Build and verify
 
@@ -156,8 +169,10 @@ export WASI_SDK_PATH=/absolute/path/to/wasi-sdk-25.0-x86_64-linux
 python3 tools/build.py wasm
 ```
 
-The build uses `-fno-fast-math`, `-ffp-contract=off`, `-fwrapv`, and `-fno-strict-aliasing`. Native `.so` building has been tested on Linux; the **ready-built browser demo runs on other desktop operating systems** without compiling C.
+The build uses `-fno-fast-math`, `-ffp-contract=off`, `-fwrapv`, and `-fno-strict-aliasing`.
+
+The sound sprite (`web/sounds.mp3` and its index `web/sounds.js`) is also checked in. Maintainers can rebuild it from the pinned CC0 sources with `python3 tools/build_sounds.py`; that needs ffmpeg with libmp3lame and network access. Native `.so` building has been tested on Linux; the **ready-built browser demo runs on other desktop operating systems** without compiling C.
 
 [Architecture and embedding](docs/ARCHITECTURE.md) · [Verification](docs/VERIFICATION.md) · [Sources and licenses](THIRD_PARTY.md)
 
-No ROM loading or asset extraction is implemented. No Nintendo model, texture, sound, level, or skeletal pose data is bundled. Small source-derived animation timing and root XYZ movement tables are included because the movement logic reads them; see the source notes rather than treating the simulation as independent of all animation data.
+No ROM loading or asset extraction is implemented. No Nintendo model, texture, sound, level, or skeletal pose data is bundled; the sound effects are Kenney's CC0 samples. Small source-derived animation timing and root XYZ movement tables are included because the movement logic reads them; see the source notes rather than treating the simulation as independent of all animation data.
