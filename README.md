@@ -16,13 +16,13 @@ The original recovery ZIP is kept in this repository. The folders below contain 
 
 A ROM-free platformer built around the Super Mario 64 US movement code, with an original explorer, a volcanic adventure, and a connected practice playground.
 
-## Original music
+## Version 0.6.0 — original music
 
 Four original tracks play quietly in the background, in the spirit of late-'90s console soundtracks: *Basalt Tide* (electric piano, strings and vibraphone), *Hush of the Spire* (a harp and music-box lullaby in three), *Lantern Trail* (marimba, brushes and ocarina), and *Skyline Drift* (a choir pad and bells). They are written as note data in `web/tracks.js` and performed live by a small Web Audio synthesizer in `web/music.js`, with no recordings, so the whole soundtrack adds about 20 KB.
 
 Tracks come from a shuffle bag: all four play before any repeats, never the same one twice in a row. Each track opens and closes sparsely and ends on a ringing chord. The next one starts over that chord, in whichever nearby key shares the most notes with it, so the music drifts from one piece to the next without a gap. Menus muffle it, the shard and star jingles briefly duck it, and it pauses while the tab is hidden. **Menu → Settings → Music** sets its volume: 50% by default, well under the sound effects; 0% turns it off.
 
-[Soundtrack notes: the tracks, editing the scores, and rendering them](docs/SOUNDTRACK.md)
+[Soundtrack notes](docs/SOUNDTRACK.md) · [Original music release notes](docs/releases/v0.6.0.md)
 
 ## Version 0.4.0 — sound, timed by the movement code
 
