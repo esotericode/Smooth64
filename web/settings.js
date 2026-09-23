@@ -1,11 +1,16 @@
 const KEY='smooth64-settings-v1';
-export const DEFAULT_SETTINGS=Object.freeze({developer:false,hints:true,timer:false});
+export const DEFAULT_SETTINGS=Object.freeze({developer:false,hints:true,timer:false,volume:.8,deadzone:.15});
+// Numeric settings: [minimum, maximum]. Everything else is a boolean.
+export const SETTING_RANGES=Object.freeze({volume:[0,1],deadzone:[.05,.35]});
 export function loadSettings(storage) {
   try {
     storage??=globalThis.localStorage;
     const saved=JSON.parse(storage.getItem(KEY)||'{}');
-    return Object.fromEntries(Object.entries(DEFAULT_SETTINGS).map(([key,value])=>
-      [key,typeof saved?.[key]==='boolean'?saved[key]:value]));
+    return Object.fromEntries(Object.entries(DEFAULT_SETTINGS).map(([key,value])=>{
+      const next=saved?.[key],range=SETTING_RANGES[key];
+      if(range)return [key,Number.isFinite(next)?Math.max(range[0],Math.min(range[1],next)):value];
+      return [key,typeof next==='boolean'?next:value];
+    }));
   } catch {return {...DEFAULT_SETTINGS};}
 }
 export function saveSettings(settings,storage) {

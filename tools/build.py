@@ -9,7 +9,8 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 VENDOR = ROOT / "vendor/libsm64/src"
 EXPORTS = ["s64_clear_surfaces", "s64_add_triangle", "s64_commit_surfaces",
-           "s64_reset", "s64_tick", "s64_state", "s64_state_size", "s64_floor_height", "s64_heal"]
+           "s64_reset", "s64_tick", "s64_state", "s64_state_size", "s64_floor_height", "s64_heal",
+           "s64_sound_count", "s64_sounds"]
 
 
 def build(target, compiler=None):

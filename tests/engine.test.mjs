@@ -32,7 +32,7 @@ test('30/60/144 Hz displays produce the same 300 simulation ticks',async()=>{
   assert.equal(new Set(results).size,1);
 });
 
-test('native GCC and browser WASM produce identical complete state bytes',async()=>{
+test('native GCC and browser WASM produce identical complete state bytes and sound requests',async()=>{
   const core=await loadCore(bytes);
   for(const [index,zone] of zones.entries()) {
     let seed=0x6400+index;
@@ -45,15 +45,19 @@ test('native GCC and browser WASM produce identical complete state bytes',async(
     }));
     const process=spawnSync('python3',['tests/trace_native.py'],{
       cwd:new URL('..',import.meta.url),encoding:'utf8',maxBuffer:2*1024*1024,
-      input:JSON.stringify({triangles:world.triangles,position:zone.position,yaw:zone.yaw,inputs}),
+      input:JSON.stringify({triangles:world.triangles,position:zone.position,yaw:zone.yaw,inputs,sounds:true}),
     });
     assert.equal(process.status,0,process.stderr);
     const expected=JSON.parse(process.stdout);
     core.loadWorld(world.triangles);core.reset(zone.position,zone.yaw);
+    let sounds=0;
     inputs.forEach((input,i)=>{
       core.tick(input);
-      assert.equal(Buffer.from(core.stateBytes()).toString('hex'),expected[i],`${zone.name}, tick ${i}`);
+      assert.equal(Buffer.from(core.stateBytes()).toString('hex'),expected[i].state,`${zone.name}, tick ${i}`);
+      assert.deepEqual(core.sounds(),expected[i].sounds,`${zone.name}, tick ${i} sounds`);
+      sounds+=expected[i].sounds.length;
     });
+    assert.ok(sounds>0,`${zone.name}: the trace exercises sound requests`);
   }
 });
 

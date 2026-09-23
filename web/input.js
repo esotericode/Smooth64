@@ -3,10 +3,29 @@ const movement=new Set(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','Arrow
 const standardPad=()=>Array.from(navigator.getGamepads?.()||[]).find(p=>p?.mapping==='standard');
 const padButtons=pad=>pad?((pad.buttons[0]?.pressed?1:0)|(pad.buttons[2]?.pressed||pad.buttons[1]?.pressed?2:0)|
   (pad.buttons[6]?.pressed||pad.buttons[7]?.pressed?4:0)):0;
+export const DEFAULT_DEADZONE=.15;
+
+// Scaled radial dead zone: inside `zone` a stick reads exactly zero, so worn
+// or drifting sticks stay still; the remaining travel is rescaled to 0..1.
+export function deadzone(x,y,zone=DEFAULT_DEADZONE) {
+  const magnitude=Math.hypot(x,y);
+  if(!(magnitude>zone))return [0,0];
+  const scale=Math.min(1,(magnitude-zone)/(1-zone))/magnitude;
+  return [x*scale,y*scale];
+}
+// Gamepad stick -> raw N64 units (+Y forward). The core ignores |axis| < 8 and
+// reaches full speed near 70, so travel past the dead zone starts at that
+// edge: the first movement outside it is the core's slowest tiptoe.
+export function stickToRaw(x,y,zone=DEFAULT_DEADZONE) {
+  const [dx,dy]=deadzone(x,-y,zone),amount=Math.hypot(dx,dy);
+  if(!amount)return [0,0];
+  const cx=dx/amount,cy=dy/amount,edge=8/Math.max(Math.abs(cx),Math.abs(cy)),radius=edge+amount*(80-edge);
+  return [Math.round(cx*radius),Math.round(cy*radius)];
+}
 
 export class Input {
   constructor(canvas,command) {
-    this.command=command;this.enabled=false;
+    this.command=command;this.enabled=false;this.deadzone=DEFAULT_DEADZONE;
     this.keys=new Set();this.pending=0;this.touchButtons=0;this.stick=[0,0];
     this.orbit=0;this.pitch=0;this.zoom=0;this.gamepadName='Keyboard';
     this.lastPad=0;this.blockedPad=0;this.menuHeld=false;this.drag=null;this.touchPointer=null;this.releaseTouches=[];
@@ -88,8 +107,8 @@ export class Input {
     if(this.stick.some(v=>v!==0)){x=Math.round(this.stick[0]*80);y=Math.round(this.stick[1]*80);}
     const gamepad=standardPad();
     if(gamepad) {
-      const [px=0,py=0]=gamepad.axes;
-      if(Math.hypot(px,py)>0.08){x=Math.round(px*80);y=Math.round(-py*80);}
+      const [px,py]=stickToRaw(gamepad.axes[0]??0,gamepad.axes[1]??0,this.deadzone);
+      if(px||py){x=px;y=py;}
       const held=padButtons(gamepad);this.blockedPad&=held;
       const pad=held&~this.blockedPad;
       this.pending|=pad&~this.lastPad;this.lastPad=pad;buttons|=pad;
@@ -104,8 +123,8 @@ export class Input {
     if(this.keys.has('KeyE'))yaw-=dt*1.9;
     const pad=standardPad();
     if(pad) {
-      if(Math.abs(pad.axes[2])>.15)yaw-=pad.axes[2]*dt*2.3;
-      if(Math.abs(pad.axes[3])>.15)pitch+=pad.axes[3]*dt*1.2;
+      const [x,y]=deadzone(pad.axes[2]??0,pad.axes[3]??0,this.deadzone);
+      yaw-=x*dt*2.3;pitch+=y*dt*1.2;
     }
     return {yaw,pitch,zoom};
   }

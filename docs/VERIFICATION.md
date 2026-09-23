@@ -45,7 +45,22 @@ Additional regression coverage:
 - Running and decelerating soles stay above the floor and keep a stance foot planted across the cycle.
 - Timer rounding handles minute boundaries without displaying `0:60.0`.
 
-`tools/test_browser.mjs` is the optional browser regression check. It exercises the real UI: clean defaults, pause/nested controls, keyboard activation without a queued jump, exact frame stepping, developer toggles, retained per-world progress, independent restart, settings persistence, touch controls, mobile layout, and the offline file with storage unavailable. It also checks for browser/WebGL errors and network requests from the offline build. Review screenshots go to `build/browser-checks/`.
+## Sound and dead zone checks
+
+The suite now passes **15 native tests and 52 Node tests**. The native/WASM parity check also compares the sound request list on every one of its 3,960 ticks, alongside all 80 state bytes; 7,452 state comparisons remain across the playground, Caldera, and ledge regressions. The upstream provenance check still verifies all 108 vendored files.
+
+- Native sound log: a standing jump reports exactly `TERRAIN_JUMP` and `YAH_WAH_HOO` on its first tick and nothing on the next; the landing reports `TERRAIN_LANDING`; reset clears the log; running reports a footstep every 3–6 ticks, twice per stride.
+- Real core traces through `audio.js`: running steps; a triple jump's push-offs, "hup", "hoo-hoo", "yahoo", three spin whooshes, and landings; a ground pound's throw, spin, drop, and impact; a turnaround's scrape; lava's scorch plus a burn on every tick of the boost.
+- Sound ID decoding by bank and terrain offset, silence for unmapped IDs, and wall-touch/kick/ledge-grab transitions.
+- Sprite slicing lands on each sample's own audio with no decoder delay and with a simulated 26 ms delay, found through the sync marker.
+- Loops start once, last while requested, release on the first tick without a request, and stop on pause; volume squares into gain; volume 0 and a locked or missing audio context play nothing; footsteps never repeat the same variation twice in a row; every cue names a real sample.
+- Stride: walking, running, tiptoe, and start-tiptoe plant the left heel on the first step-sound frame and the right on the second.
+- Dead zone: stick drift up to 15% moves neither the explorer nor the camera; full tilt still reaches raw 80 (57/57 on a diagonal); the first movement past the zone is raw 8–9; diagonals start at the same radius; a larger zone tames a worn stick.
+- Settings: volume and dead zone persist, and invalid or out-of-range saved values fall back or clamp.
+
+In Chromium, the MP3 sprite decodes to its exact length with the sync marker in place. The browser check hears footsteps and the coin chime during real play and confirms that the new sliders persist across reload. A separate offline-file run played footsteps, a coin, the braking scrape, a jump, and its landing from `file://` with no network requests, errors, or warnings. Levels were measured by rendering every cue through the real audio graph offline. At the default volume the loudest single cue peaks near −2 dBFS, and a soft clipper only rounds pile-ups at full volume. These are automated measurements, not a listening session on speakers or headphones.
+
+`tools/test_browser.mjs` is the optional browser regression check. It exercises the real UI: clean defaults, footstep and pickup sounds, pause/nested controls, keyboard activation without a queued jump, exact frame stepping, developer toggles, retained per-world progress, independent restart, settings persistence (including volume and dead zone), touch controls, mobile layout, and the offline file with storage unavailable. It also checks for browser/WebGL errors and network requests from the offline build. Review screenshots go to `build/browser-checks/`.
 
 Commands are in the README. The cross-compiler test runs the same inputs through the actual native shared library and committed WASM, not a JavaScript rewrite of physics.
 

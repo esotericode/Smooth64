@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {ExplorerRig} from '../web/character.js';
 import {Vector3,Box3} from '../web/vendor/three.module.min.js';
-import {poseFor} from '../web/pose.js';
+import {poseFor,FIRST_STEP} from '../web/pose.js';
 import {CourseProgress} from '../web/progress.js';
 import {createWorld} from '../web/world.js';
 import {animations} from '../web/animations.js';
@@ -125,5 +125,24 @@ test('the running stance sole stays grounded while the torso leans and bobs',()=
     const bottoms=rig.feet.map(foot=>new Box3().setFromObject(foot).min.y);
     assert.ok(bottoms.every(y=>y>-.5),`${name} ${speed}, ${frame}: sole under floor: ${bottoms}`);
     assert.ok(Math.min(...bottoms)<4,`${name} ${speed}, ${frame}: both soles floating: ${bottoms}`);
+  }
+});
+
+test('each gait plants a heel on the frames the core plays its footstep sounds',()=>{
+  // mario_actions_moving.c: play_step_sound(m, first, second) for each gait.
+  const second={WALKING:49,RUNNING:45,TIPTOE:72,START_TIPTOE:22};
+  for(const [anim,first] of Object.entries(FIRST_STEP)) {
+    const animation=animations.findIndex(a=>a[0]===anim);
+    // Undo the torso lean to read each sole's height above the floor (13 when planted).
+    const heights=frame=>{
+      const p=poseFor({...state,position:[0,0,0],yaw:0,action:0x04000440,animation,frame,speed:20},'ACT_WALKING');
+      const c=Math.cos(p.rotation[0]),s=Math.sin(p.rotation[0]);
+      return p.feet.map(f=>f[1]*c-f[2]*s+p.root[1]);
+    };
+    for(const [frame,foot] of [[first,0],[second[anim],1]]) {
+      assert.ok(heights(frame-1.5)[foot]>13.5,`${anim} frame ${frame}: foot ${foot} still in the air just before`);
+      assert.ok(Math.abs(heights(frame)[foot]-13)<.3,`${anim} frame ${frame}: foot ${foot} down on the step`);
+      assert.ok(Math.abs(heights(frame+1.5)[foot]-13)<1e-9,`${anim} frame ${frame}: foot ${foot} planted just after`);
+    }
   }
 });

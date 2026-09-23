@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {Input} from '../web/input.js';
+import {Input,deadzone,stickToRaw} from '../web/input.js';
 
 class Element extends EventTarget {
   constructor(){super();this.style={};this.value='';}
@@ -67,4 +67,23 @@ test('touch cancellation releases buttons and ignores a second stick pointer',()
   assert.ok(input.sample(0).x>0);pointer(stick,'pointercancel',1);assert.equal(input.sample(0).x,0);
   pointer(button,'pointerdown',3);assert.equal(input.sample(0).buttons,1);
   pointer(button,'lostpointercapture',3);assert.equal(input.sample(0).buttons,0);
+});
+
+test('gamepad sticks ignore drift inside the dead zone and keep their full range outside it',()=>{
+  const {input,setPad}=setup();input.setEnabled(true);
+  const pad={mapping:'standard',axes:[0,0,0,0],buttons:Array.from({length:10},()=>({pressed:false}))};setPad(pad);
+  for(const axes of [[.1,0],[0,.14],[.1,-.1],[-.08,.12]]) {
+    pad.axes=[...axes,...axes];
+    assert.deepEqual([input.sample(0).x,input.sample(0).y],[0,0],`drift ${axes} stays still`);
+    assert.deepEqual(input.cameraDelta(1),{yaw:0,pitch:0,zoom:0},`camera drift ${axes} stays still`);
+  }
+  pad.axes=[0,-1,0,0];assert.equal(input.sample(0).y,80,'full forward is still the full N64 range');
+  pad.axes=[.707,.707,0,0];assert.deepEqual([input.sample(0).x,input.sample(0).y],[57,-57]);
+  // Just outside the zone is the core's slowest movement (its own axis dead zone ends at 8).
+  pad.axes=[.16,0,0,0];assert.equal(input.sample(0).x,9);
+  const [x,y]=stickToRaw(.13,-.13);assert.ok(x>=8&&y>=8,'diagonals start moving at the same radius');
+  pad.axes=[0,0,1,0];assert.ok(Math.abs(input.cameraDelta(1).yaw+2.3)<1e-9,'full camera turn speed');
+  input.deadzone=.3;pad.axes=[.25,0,.25,0];
+  assert.equal(input.sample(0).x,0);assert.equal(input.cameraDelta(1).yaw,0,'a larger zone tames a worn stick');
+  assert.deepEqual(deadzone(NaN,0),[0,0]);assert.ok(Math.abs(deadzone(.6,0,.2)[0]-.5)<1e-12);
 });
