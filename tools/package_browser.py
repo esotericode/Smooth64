@@ -73,7 +73,8 @@ Drag the view: camera     R: checkpoint  Controls button: full move guide
 Escape / P: pause menu    Gamepad Start: pause menu
 
 SOUND: starts after your first click or key press. Menu > Settings > Sound
-effects sets the volume. If a gamepad stick drifts, raise Menu > Settings >
+effects sets the volume, and Menu > Settings > Music sets the quiet background
+music (0% turns it off). If a gamepad stick drifts, raise Menu > Settings >
 Stick dead zone (15% by default).
 
 Long jump: run, press Shift, then Space.
@@ -94,7 +95,7 @@ healing coins across the original courses and trails. Menu > Practice destinatio
 opens every area. Power, coins, lava and checkpoint recovery work as in the level.
 
 SETTINGS: the default view shows your power and collectibles. Open Menu for
-destinations, objectives, sound volume, the stick dead zone, movement hints and
+destinations, objectives, sound and music volume, the stick dead zone, movement hints and
 the optional timer. Enable Developer tools for action/velocity readouts, frame
 stepping, slow motion, trails and mesh. Your settings are remembered. Each
 world's progress survives switching worlds and checkpoint retries until you

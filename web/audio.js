@@ -1,4 +1,5 @@
 import {MARKER,SAMPLES} from './sounds.js';
+import {Music} from './music.js';
 
 // Sound effects. Presentation only: the movement core reports which original
 // sound each action requested on a tick (s64_sounds), and this voices it with
@@ -46,6 +47,11 @@ const CUES={
   lose:[[['lose'],-19,[1,1]]],
   click:[[['click'],-28,[1,1]]],
 };
+// Jingles the music steps aside for, in seconds.
+const DUCK={shard:1,star:1.2,reveal:1};
+// Music gain at full volume. At the default 50% the music averages about
+// -34 LUFS, well under the footsteps and far under the jingles.
+const MUSIC_TRIM=.63;
 // Upstream IDs (vendor/libsm64/src/decomp/include/audio_defines.h), by bank.
 // Terrain sounds occupy eight IDs each: base + the floor's terrain type.
 const ACTION={0x2D:'hang',0x35:'throw',0x37:'spin',0x38:'spin',0x42:'bonk',0x44:'touch',0x45:'bonk',0x5A:'spin'};
@@ -90,10 +96,13 @@ function browserContext() {
   return Context?new Context({latencyHint:'interactive'}):null;
 }
 
+const newMusic=(ctx,output,random)=>new Music(ctx,output,{random});
+
 export class GameAudio {
-  constructor({volume=.8,createContext=browserContext,random=Math.random}={}) {
-    this.volume=volume;this.createContext=createContext;this.random=random;
+  constructor({volume=.8,music=.5,createContext=browserContext,createMusic=newMusic,random=Math.random}={}) {
+    this.volume=volume;this.musicVolume=music;this.createContext=createContext;this.createMusic=createMusic;this.random=random;
     this.ctx=null;this.bytes=null;this.samples=null;this.reversed={};this.beds={};this.voices=0;this.last={};
+    this.music=null;this.wantMusic=false;this.hidden=false;this.timer=null;
   }
   // The sprite's bytes arrive with the other game files; decoding waits for a
   // user gesture, since browsers only let pages start audio after one.
@@ -111,9 +120,12 @@ export class GameAudio {
       }
       half.gain.value=.5;limiter.curve=curve;limiter.oversample='2x';
       this.bus.connect(half).connect(limiter).connect(this.ctx.destination);
+      // The music has its own volume and shares the limiter.
+      this.musicBus=this.ctx.createGain();this.musicBus.gain.value=this.musicVolume**2*MUSIC_TRIM;this.musicBus.connect(half);
       this.decode();
     }
-    if(this.ctx.state==='suspended')this.ctx.resume().catch(()=>{});
+    if(this.ctx.state==='suspended'&&!this.hidden)this.ctx.resume().catch(()=>{});
+    this.syncMusic();
   }
   decode() {
     if(!this.bytes||this.samples||this.decoding)return;
@@ -178,6 +190,7 @@ export class GameAudio {
   // Play a named cue. `gain` scales it (e.g. by impact), `rate` bends its pitch.
   cue(name,{gain=1,rate=1,delay=0}={}) {
     if(!this.ready||!CUES[name])return;
+    if(DUCK[name])this.music?.duck(DUCK[name],delay);
     for(const [list,loudness,[low,high],options={}] of CUES[name]) {
       if(this.voices>=32)return;
       const sampleName=this.pick(list,`${name}:${list[0]}`),sample=options.reverse?this.reverse(sampleName):this.samples[sampleName];
@@ -216,6 +229,39 @@ export class GameAudio {
   }
   // Stop continuous sounds: pauses, menus, knockouts and teleports.
   hush() {for(const kind of Object.keys(this.beds))this.release(kind);}
+  // Background music: wanted once play begins, heard while its volume is up.
+  playMusic() {this.wantMusic=true;this.syncMusic();}
+  setMusicVolume(value) {
+    this.musicVolume=Math.max(0,Math.min(1,value));
+    if(this.musicBus)this.musicBus.gain.setTargetAtTime(this.musicVolume**2*MUSIC_TRIM,this.ctx.currentTime,.05);
+    this.syncMusic();
+  }
+  syncMusic() {
+    const on=this.wantMusic&&this.musicVolume>0&&!!this.ctx&&!this.musicFailed;
+    try {
+      if(on&&!this.music?.playing) {
+        this.music??=this.createMusic(this.ctx,this.musicBus,this.random);this.music.start();
+        // The scheduler looks 0.4 s ahead, so a tenth-second beat never runs dry.
+        this.timer??=setInterval(()=>this.updateMusic(),100);this.timer.unref?.();
+      } else if(!on&&this.music?.playing) {
+        this.music.stop();clearInterval(this.timer);this.timer=null;
+      }
+    } catch(error) {this.failMusic(error);}
+  }
+  updateMusic() {try {this.music?.update();} catch(error) {this.failMusic(error);}}
+  // Music is optional, like the sound file: a failure turns it off, not the game.
+  failMusic(error) {
+    console.warn('Music unavailable:',error?.message||error);
+    this.musicFailed=true;clearInterval(this.timer);this.timer=null;
+    try {this.music?.stop();} catch { /* already failed */ }
+  }
+  // Muffled under menus.
+  pauseMusic(paused) {this.music?.setPaused(paused);}
+  // A hidden tab falls silent and picks up where it left off.
+  setHidden(hidden) {
+    this.hidden=hidden;
+    if(this.ctx)Promise.resolve(hidden?this.ctx.suspend?.():this.ctx.resume()).catch(()=>{});
+  }
   // One simulation tick: the core's requests plus a few transitions.
   tick(sounds,previous,current,previousName,name) {
     if(!this.ready){this.hush();return;}

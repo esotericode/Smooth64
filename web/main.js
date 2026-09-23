@@ -12,7 +12,7 @@ import {GameAudio} from './audio.js';
 
 const $=id=>document.getElementById(id);
 const canvas=$('game'),menu=$('menu'),help=$('help'),victory=$('victory');
-const clock=new FixedClock(),settings=loadSettings(),audio=new GameAudio({volume:settings.volume});
+const clock=new FixedClock(),settings=loadSettings(),audio=new GameAudio({volume:settings.volume,music:settings.music});
 // Sounds are optional: the game starts without them if the file is missing.
 fetch('sounds.mp3').then(response=>response.ok?response.arrayBuffer():null).then(bytes=>bytes&&audio.load(bytes)).catch(()=>{});
 // Browsers let a page start audio only after a click, tap or key press.
@@ -72,7 +72,7 @@ function setMode(next) {
 }
 function start(next='caldera') {
   if(!core||started)return;
-  started=true;document.body.classList.add('playing');$('welcome').hidden=true;renderer.intro=false;audio.unlock();
+  started=true;document.body.classList.add('playing');$('welcome').hidden=true;renderer.intro=false;audio.unlock();audio.playMusic();
   if(next!==mode)setMode(next);else reset();
   for(const id of ['menu-button','level-hud','location'])$(id).hidden=false;
   applySettings();
@@ -97,7 +97,7 @@ function applySettings() {
     if(!SETTING_RANGES[key]){$(`setting-${key}`).checked=value;continue;}
     $(`setting-${key}`).value=Math.round(value*100);write(`${key}-value`,`${Math.round(value*100)}%`);
   }
-  audio.setVolume(settings.volume);if(input)input.deadzone=settings.deadzone;
+  audio.setVolume(settings.volume);audio.setMusicVolume(settings.music);if(input)input.deadzone=settings.deadzone;
   for(const id of ['telemetry','toolbar','render-stats'])$(id).hidden=!started||!settings.developer;
   $('technical-guide').hidden=!settings.developer;$('timer-hud').hidden=!settings.timer;
   if(!settings.developer) {
@@ -263,6 +263,7 @@ function renderHud() {
 function frame(now) {
   const dt=Math.min((now-last)/1000||0,.1);last=now;input.pollCommands();
   if(paused()||respawning)audio.hush();
+  audio.pauseMusic(modalOpen());
   if(started&&!modalOpen()) {
     const delta=input.cameraDelta(dt);renderer.yaw+=delta.yaw;
     renderer.pitch=Math.max(.12,Math.min(1.25,renderer.pitch+delta.pitch));
@@ -309,7 +310,7 @@ for(const button of document.querySelectorAll('[data-mode]'))button.addEventList
   menu.close();
 });
 window.addEventListener('blur',()=>{if(started&&!modalOpen())openMenu();});
-document.addEventListener('visibilitychange',()=>{if(document.hidden&&started&&!modalOpen())openMenu();});
+document.addEventListener('visibilitychange',()=>{audio.setHidden(document.hidden);if(document.hidden&&started&&!modalOpen())openMenu();});
 
 try {
   worlds={playground:createWorld(),caldera:createCaldera()};

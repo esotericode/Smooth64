@@ -36,14 +36,20 @@ const destination=async(page,index)=>{await openMenu(page);await page.locator('#
 const count=async page=>Number(await page.locator('#coin-count').textContent());
 try {
   const page=await pageFor({viewport:{width:1280,height:800}});
-  // Record each sample the game starts (by duration) without changing the game.
+  // Record each sample the game starts (by duration) and count the music's
+  // oscillator notes, without changing the game.
   await page.addInitScript(()=>{
     window.__sounds=[];const start=AudioBufferSourceNode.prototype.start;
     AudioBufferSourceNode.prototype.start=function(...args){window.__sounds.push(Math.round(this.buffer.duration*1000));return start.apply(this,args);};
+    window.__notes=0;const note=OscillatorNode.prototype.start;
+    OscillatorNode.prototype.start=function(...args){window.__notes++;return note.apply(this,args);};
   });
   await page.goto(url);await ready(page);
   await page.screenshot({path:path.join(out,'welcome.png')});
+  assert.equal(await page.evaluate(()=>window.__notes),0,'no music on the title screen');
   await page.keyboard.press('Space');await page.locator('#level-hud').waitFor();
+  // The music begins with play and keeps scheduling notes.
+  await page.waitForFunction(()=>window.__notes>20);
   assert.equal(await page.locator('#telemetry').isVisible(),false);assert.equal(await page.locator('#toolbar').isVisible(),false);
   assert.equal(await page.locator('#timer-hud').isVisible(),false);
   const {SAMPLES}=await import(pathToFileURL(path.join(web,'sounds.js')).href);
@@ -71,7 +77,7 @@ try {
   for(const id of ['freeze-button','slow-button','wire-button','trail-button'])assert.equal(await page.locator('#'+id).getAttribute('aria-pressed'),'false');
   const time=await page.locator('#level-time').textContent();await page.keyboard.press('n');
   await page.waitForFunction(before=>document.getElementById('level-time').textContent!==before,time);
-  console.log('PASS clean defaults, footstep and pickup sounds, modal input, nested help, developer gating, pause and exact stepping');
+  console.log('PASS clean defaults, music, footstep and pickup sounds, modal input, nested help, developer gating, pause and exact stepping');
 
   await openMenu(page);savedCoins=await count(page);await page.locator('[data-mode="playground"]').click();assert.equal(await count(page),0);assert.equal(await page.locator('#shards-hud').isVisible(),false);
   assert.equal(await page.locator('#power-meter').isVisible(),true);
@@ -88,12 +94,17 @@ try {
   await openMenu(page);await page.locator('#setting-developer').check();
   await page.locator('#setting-volume').fill('35');await page.locator('#setting-deadzone').fill('22');
   assert.equal(await page.locator('#volume-value').textContent(),'35%');
+  // Music at 0% stops scheduling notes.
+  await page.locator('#setting-music').fill('0');assert.equal(await page.locator('#music-value').textContent(),'0%');
+  await page.waitForTimeout(600);const quiet=await page.evaluate(()=>window.__notes);await page.waitForTimeout(1500);
+  assert.equal(await page.evaluate(()=>window.__notes),quiet,'no music at 0%');
   await page.reload();await ready(page);await page.locator('#start').click();assert.equal(await page.locator('#telemetry').isVisible(),true);
   await openMenu(page);assert.equal(await page.locator('#setting-developer').isChecked(),true);
   assert.equal(await page.locator('#setting-volume').inputValue(),'35');assert.equal(await page.locator('#deadzone-value').textContent(),'22%');
+  assert.equal(await page.locator('#setting-music').inputValue(),'0');await page.locator('#setting-music').fill('50');
   await page.locator('#setting-developer').uncheck();await page.locator('#resume-button').click();
   await page.screenshot({path:path.join(out,'playground.png')});
-  console.log('PASS world switching, preserved pickups/checkpoints, independent restart and saved settings, volume and dead zone');
+  console.log('PASS world switching, preserved pickups/checkpoints, independent restart and saved settings, volumes and dead zone');
   await page.context().browser().close();
 
   const touch=await pageFor({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:1});
@@ -115,12 +126,17 @@ try {
   assert.ok(existsSync(offline),'run tools/package_browser.py before this check');
   const file=await pageFor({viewport:{width:1000,height:700}}),network=[];
   file.on('request',req=>{if(/^https?:/.test(req.url()))network.push(req.url());});
-  await file.addInitScript(()=>Object.defineProperty(window,'localStorage',{get(){throw new Error('Storage unavailable');}}));
+  await file.addInitScript(()=>{
+    Object.defineProperty(window,'localStorage',{get(){throw new Error('Storage unavailable');}});
+    window.__notes=0;const note=OscillatorNode.prototype.start;
+    OscillatorNode.prototype.start=function(...args){window.__notes++;return note.apply(this,args);};
+  });
   await file.goto(pathToFileURL(offline).href);await ready(file);await file.locator('#start').click();
   assert.equal(await file.locator('#level-hud').isVisible(),true);assert.equal(await file.locator('#telemetry').isVisible(),false);
+  await file.waitForFunction(()=>window.__notes>0);
   await openMenu(file);await file.locator('#setting-developer').check();await file.locator('#resume-button').click();
   assert.equal(await file.locator('#telemetry').isVisible(),true);assert.deepEqual(network,[],'offline build never requests network assets');
-  console.log('PASS offline package and unavailable storage');
+  console.log('PASS offline package with music, and unavailable storage');
   assert.deepEqual(errors,[],'no JavaScript or WebGL console errors');
   console.log('PASS no browser or WebGL errors');
 } finally {

@@ -1,7 +1,7 @@
 const KEY='smooth64-settings-v1';
-export const DEFAULT_SETTINGS=Object.freeze({developer:false,hints:true,timer:false,volume:.8,deadzone:.15});
+export const DEFAULT_SETTINGS=Object.freeze({developer:false,hints:true,timer:false,volume:.8,music:.5,deadzone:.15});
 // Numeric settings: [minimum, maximum]. Everything else is a boolean.
-export const SETTING_RANGES=Object.freeze({volume:[0,1],deadzone:[.05,.35]});
+export const SETTING_RANGES=Object.freeze({volume:[0,1],music:[0,1],deadzone:[.05,.35]});
 export function loadSettings(storage) {
   try {
     storage??=globalThis.localStorage;
