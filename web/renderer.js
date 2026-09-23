@@ -72,7 +72,7 @@ export class PlaygroundRenderer {
     if(this.level) {
       this.scene.remove(this.level);
       this.level.traverse(o=>{o.geometry?.dispose();for(const m of [o.material].flat())if(m){m.map?.dispose();m.dispose();}});
-      for(const line of this.wire.children)line.geometry.dispose();this.wire.clear();
+      for(const line of this.wire.children){line.geometry.dispose();line.material.dispose();}this.wire.clear();
     }
     const theme={...PLAYGROUND_THEME,...world.theme};this.theme=theme;
     this.level=new T.Group();this.scene.add(this.level);
@@ -115,7 +115,7 @@ export class PlaygroundRenderer {
       this.wire.add(new T.LineSegments(new T.WireframeGeometry(geometry),new T.LineBasicMaterial({color:'#174f49',depthTest:false,transparent:true,opacity:.55})));
     }
     this.dressing=world.kind==='caldera'?decorateCaldera(this.level,world,this):(decoratePlayground(this.level,world),null);
-    this.pickups=(world.pickups||world.sparks.map(s=>({...s,kind:'spark'}))).map((pickup,i)=>this.pickup(pickup,i));
+    this.pickups=world.pickups.map((pickup,i)=>this.pickup(pickup,i));
   }
   pickup(pickup,index) {
     const group=new T.Group();group.position.set(...pickup.position);this.level.add(group);
@@ -164,7 +164,8 @@ export class PlaygroundRenderer {
   // (see main.js) skips it; it never touches the simulation.
   flyover(from,look,duration=3.4) {this.shot={from:new T.Vector3(...from),look:new T.Vector3(...look),t:0,duration};}
   reset(position,cameraYaw,pitch) {
-    this.yaw=cameraYaw;if(pitch!==undefined)this.pitch=pitch;this.viewPitch=this.pitch;this.target.set(position[0],position[1]+100,position[2]);
+    this.shot=null;
+    this.yaw=cameraYaw;this.pitch=pitch??.43;this.viewPitch=this.pitch;this.target.set(position[0],position[1]+100,position[2]);
     this.camera.position.copy(this.target).add(new T.Vector3(Math.sin(this.yaw)*950,510,Math.cos(this.yaw)*950));
     this.trailPoints=[];this.character.snap();this.effects.clear();
     this.trail.geometry.dispose();this.trail.geometry=new T.BufferGeometry();
@@ -183,12 +184,14 @@ export class PlaygroundRenderer {
       this.width=w;this.height=h;this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();
     }
     this.time+=animDt;
-    const p=current.position.map((n,i)=>previous.position[i]+(n-previous.position[i])*alpha);
+    const contact=name=>name?.includes('LEDGE')||name?.includes('HANG');
+    const caught=contact(actionName)&&!contact(previousName);
+    const p=caught?current.position:current.position.map((n,i)=>previous.position[i]+(n-previous.position[i])*alpha);
     this.character.position.set(...p);
     let angle=current.yaw-previous.yaw;angle=((angle+32768)&65535)-32768;
-    this.character.rotation.y=(previous.yaw+angle*alpha)*Math.PI/32768;
+    this.character.rotation.y=(caught?current.yaw:previous.yaw+angle*alpha)*Math.PI/32768;
     this.character.animate(previous,current,alpha,previousName,actionName,animDt);
-    const time=(previous.tick+(current.tick-previous.tick)*alpha)/30;
+    const time=this.time; // Pickups keep their phase through checkpoint resets.
     const hidden=view.found||new Set(),lit=view.lit||new Set(),revealed=view.revealed||new Set();
     for(const pickup of this.pickups) {
       const {group,parts,kind,index:i}=pickup;

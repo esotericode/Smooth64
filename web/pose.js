@@ -207,9 +207,10 @@ export function poseFor(s,name='ACT_IDLE') {
     const stride=Math.sin(cycle)*(s.speed<0?-1:1),lift=Math.cos(cycle);
     p.root[1]+=Math.abs(stride)*3*speed;p.rotation[0]=speed*.13;
     p.hands=[[-48,9,-stride*29*speed],[48,9,stride*29*speed]];
-    p.feet=[[-22,-67+Math.max(0,lift)*15*speed,stride*32*speed],
-            [22,-67+Math.max(0,-lift)*15*speed,-stride*32*speed]];
-    p.footPitch=[stride*.3*speed,-stride*.3*speed];
+    // Place the stance sole on the ground even while the torso leans/bobs.
+    const lifts=[Math.max(0,lift),Math.max(0,-lift)];
+    p.feet=[-1,1].map((side,i)=>underPitch(p,[side*22,13+lifts[i]*15*speed,-side*stride*32*speed]));
+    p.footPitch=lifts.map((height,i)=>-p.rotation[0]+height*(i?-1:1)*stride*.3*speed);
   } else {
     // Retain the other branch's richer idle/secondary animation vocabulary.
     // Sample it at simulation time, so pause/step remains deterministic.
@@ -232,7 +233,7 @@ export function actionCue(name,s,cameraYaw) {
     const arrow=['↑','↗','→','↘','↓','↙','←','↖'][octant];
     return `Hanging · push ${arrow} toward the ledge to climb · A / Space: quick climb · Z / Shift: drop`;
   }
-  if(name.includes('LEDGE_CLIMB'))return 'Climbing · hands stay on the edge until your feet are safely up.';
+  if(name.includes('LEDGE_CLIMB'))return 'Climbing…';
   if(name==='ACT_AIR_HIT_WALL')return 'Wall contact · tap A / Space now to kick off.';
   if(name.includes('HANG'))return 'Ceiling hang · hold A / Space to keep your grip; use the stick to move.';
   return '';

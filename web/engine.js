@@ -60,7 +60,9 @@ export class FixedClock {
     // Long stalls discard wall time rather than bursting queued controller input.
     this.accumulator+=Math.min(Math.max(seconds,0),0.25);
     while(this.accumulator+1e-10>=this.step) {
-      tick(); this.accumulator=Math.max(0,this.accumulator-this.step);
+      this.accumulator=Math.max(0,this.accumulator-this.step);
+      // A star dialog or pause can stop a multi-tick display frame immediately.
+      if(tick()===false){this.reset();break;}
     }
     return this.accumulator/this.step;
   }

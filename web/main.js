@@ -1,250 +1,263 @@
-import {createWorld,zones as playgroundZones} from './world.js';
+import {createWorld} from './world.js';
 import {createCaldera} from './caldera.js';
 import {animationName} from './animations.js';
 import {loadCore,FixedClock} from './engine.js';
 import {Input} from './input.js';
 import {PlaygroundRenderer} from './renderer.js';
-import {CourseProgress} from './progress.js';
 import {LevelSession,formatTime} from './level.js';
+import {healthWedges,respawnReason} from './rules.js';
+import {loadSettings,saveSettings} from './settings.js';
 import {actionCue} from './pose.js';
 
 const $=id=>document.getElementById(id);
-const canvas=$('game'),help=$('help'),victory=$('victory');
-let core,renderer,input,previous,current,actions,progress,session,worlds;
-let mode='playground',world,zones=playgroundZones;
-let started=false,paused=false,slow=false,zoneIndex=0,last=0,frames=0,frameTime=0;
-let lastInput={x:0,y:0,buttons:0,yaw:0},helpWasPaused=false,toastTimer,respawning=0;
-const clock=new FixedClock();
-function toast(message,duration=2600) {
-  clearTimeout(toastTimer);$('toast').textContent=message;$('toast').hidden=false;
+const canvas=$('game'),menu=$('menu'),help=$('help'),victory=$('victory');
+const clock=new FixedClock(),settings=loadSettings();
+let core,renderer,input,previous,current,actions,worlds,sessions,world,session,mode;
+let started=false,debugPaused=false,slow=false,last=0,frames=0,frameTime=0,renderAlpha=1;
+let lastInput={x:0,y:0,buttons:0,yaw:0},toastTimer,respawning=0,meterWedges=-1;
+const modalOpen=()=>menu.open||help.open||victory.open;
+const paused=()=>!started||modalOpen()||debugPaused;
+const actionName=()=>actions?.[current.action]||`ACT_${current.action.toString(16)}`;
+function write(id,value) {const text=String(value);if($(id).textContent!==text)$(id).textContent=text;}
+function toast(message,duration=3200) {
+  clearTimeout(toastTimer);write('toast',message);$('toast').hidden=false;
   toastTimer=setTimeout(()=>$('toast').hidden=true,duration);
 }
 function bump(id) {const el=$(id);el.classList.remove('bump');void el.offsetWidth;el.classList.add('bump');}
-// Put the explorer at a destination (playground) or checkpoint (level).
-function place(zone) {
-  current=core.reset(zone.position,zone.yaw);previous=current;
-  clock.reset();input.clear();lastInput={x:0,y:0,buttons:0,yaw:0};
-  renderer.reset(zone.position,zone.camera,zone.pitch);
-  $('tip-text').textContent=zone.note;
-  canvas.focus();renderHud();
+function syncInput() {
+  input?.setEnabled(started&&!modalOpen()&&!respawning);
+  document.body.classList.toggle('modal-open',modalOpen());
+  $('freeze-button').setAttribute('aria-pressed',debugPaused);
+  write('freeze-button',debugPaused?'Unfreeze':'Freeze');
 }
-function reset(index=zoneIndex) {
-  if(mode==='caldera') {
-    // Only lit checkpoints can be chosen; R returns to the current one.
-    const zone=zones[index];
-    if(!session.lit.has(`checkpoint-${zone.id}`))return;
-    session.checkpoint=index;
-  }
-  zoneIndex=index;place(zones[index]);
-  document.querySelectorAll('[data-zone]').forEach((button,i)=>button.classList.toggle('active',i===index));
+function syncPause() {clock.reset();input?.clear();syncInput();}
+function cancelRespawn() {respawning=0;$('fade').hidden=true;}
+function place(zone,{keepFade=false}={}) {
+  if(!keepFade)cancelRespawn();
+  current=core.reset(zone.position,zone.yaw);previous=current;renderAlpha=1;
+  clock.reset();input.clear();lastInput={x:0,y:0,buttons:0,yaw:0};
+  renderer.reset(zone.position,zone.camera,zone.pitch);syncInput();renderHud();
+}
+function reset(index=session.checkpoint) {
+  const zone=session.visit(index);if(!zone)return;
+  place(zone);return zone;
 }
 function buildZoneList() {
-  $('zone-list').replaceChildren();
-  $('zones-title').textContent=mode==='caldera'?'CHECKPOINTS':'EXPLORE THE PLAYGROUND';
-  zones.forEach((zone,index)=>{
+  $('zone-list').replaceChildren();write('zones-title',world.freeTravel?'Practice destinations':'Checkpoints');
+  world.zones.forEach((zone,index)=>{
     if(zone.section) {
-      const label=document.createElement('span');
-      label.className='zone-section';label.textContent=zone.section;$('zone-list').append(label);
+      const label=document.createElement('span');label.className='zone-section';label.textContent=zone.section;$('zone-list').append(label);
     }
     const button=document.createElement('button');button.dataset.zone=index;
-    button.innerHTML=`<b>${String(index+1).padStart(2,'0')}</b><span>${zone.name}</span><small></small>`;
-    button.addEventListener('click',()=>reset(index));$('zone-list').append(button);
+    const number=document.createElement('b'),name=document.createElement('span'),badge=document.createElement('small');
+    number.textContent=String(index+1).padStart(2,'0');name.textContent=zone.name;button.append(number,name,badge);
+    button.addEventListener('click',()=>{if(reset(index)){menu.close();toast(zone.note,5000);}});
+    $('zone-list').append(button);
   });
 }
 function setMode(next) {
-  mode=next;world=worlds[next];zones=world.zones;
-  core.loadWorld(world.triangles);renderer.load(world);renderer.pitch=.43;
+  cancelRespawn();clearTimeout(toastTimer);$('toast').hidden=true;
+  mode=next;world=worlds[next];session=sessions[next];debugPaused=false;slow=false;
+  core.loadWorld(world.triangles);renderer.load(world);
   document.body.classList.toggle('caldera',mode==='caldera');
-  for(const tab of document.querySelectorAll('[data-mode]'))tab.setAttribute('aria-selected',tab.dataset.mode===mode);
-  $('edition').innerHTML=mode==='caldera'?'CINDER CALDERA <i> / </i> LEVEL 01':'MOVEMENT PLAYGROUND <i> / </i> 003';
-  if(mode==='caldera')session=new LevelSession(world);
-  $('status').innerHTML=`<i></i>${mode==='caldera'?'Level in progress':'Playground ready'}`;
-  buildZoneList();
-  if(started)showPanels();
-  reset(0);
+  buildZoneList();reset(session.checkpoint);applySettings();
+  for(const button of document.querySelectorAll('[data-mode]'))button.setAttribute('aria-pressed',button.dataset.mode===mode);
 }
-function showPanels() {
-  const level=mode==='caldera';
-  for(const id of ['zones','tip','telemetry','toolbar'])$(id).hidden=false;
-  $('challenge').hidden=level;$('objectives').hidden=!level;$('level-hud').hidden=!level;
-}
-function start(next='playground') {
+function start(next='caldera') {
   if(!core||started)return;
-  started=true;document.body.classList.add('playing');
-  $('welcome').hidden=true;renderer.intro=false;
-  if(next!==mode)setMode(next);else reset(0);
-  showPanels();
-  if(mode==='caldera')renderer.flyover(world.intro.from,world.intro.look);
-  $('footer-left').textContent='DRAG TO ORBIT · SCROLL TO ZOOM';
+  started=true;document.body.classList.add('playing');$('welcome').hidden=true;renderer.intro=false;
+  if(next!==mode)setMode(next);else reset();
+  for(const id of ['menu-button','level-hud','location'])$(id).hidden=false;
+  applySettings();
+  if(world.intro)renderer.flyover(world.intro.from,world.intro.look);
+  toast(mode==='caldera'?'Reach the Ember Star at the summit. Start through the broken gate.':'Explore at your own pace. Every practice area is in the Menu.',5000);
+  canvas.focus();
 }
-function setPaused(value) {
-  paused=value;clock.reset();$('paused').hidden=!paused;
-  $('pause-button').querySelector('span').textContent=paused?'Resume':'Pause';
-  $('status').innerHTML=`<i></i>${paused?'Paused':mode==='caldera'?'Level in progress':'Playground ready'}`;
+function openMenu() {
+  if(!started||modalOpen())return;
+  renderMenu();menu.showModal();syncPause();
 }
-function toggleSlow() {
-  slow=!slow;$('slow-button').setAttribute('aria-pressed',slow);
-  $('time-scale').textContent=slow?'¼× speed':'1× speed';
+function openHelp() {if(help.open||victory.open)return;help.showModal();syncPause();}
+function restartWorld() {
+  session.reset();debugPaused=false;reset(0);
+  if(menu.open)menu.close();if(victory.open)victory.close();
+  if(world.intro)renderer.flyover(world.intro.from,world.intro.look);
+  toast('A fresh start. Every coin is back.');syncPause();
 }
-function toggleMesh() { renderer.wire.visible=!renderer.wire.visible;$('wire-button').setAttribute('aria-pressed',renderer.wire.visible); }
-// A level fall or knockout: a short fade, then the current checkpoint.
+function applySettings() {
+  document.body.classList.toggle('developer',settings.developer);
+  for(const key of Object.keys(settings))$(`setting-${key}`).checked=settings[key];
+  for(const id of ['telemetry','toolbar','render-stats'])$(id).hidden=!started||!settings.developer;
+  $('technical-guide').hidden=!settings.developer;$('timer-hud').hidden=!settings.timer;
+  if(!settings.developer) {
+    slow=false;debugPaused=false;
+    if(renderer){renderer.wire.visible=false;renderer.trail.visible=false;}
+  }
+  $('slow-button').setAttribute('aria-pressed',slow);write('time-scale',slow?'¼× speed':'1× speed');
+  $('wire-button').setAttribute('aria-pressed',!!renderer?.wire.visible);
+  $('trail-button').setAttribute('aria-pressed',!!renderer?.trail.visible);
+  syncInput();
+  if(current)renderHud();
+}
 function respawn(message) {
   if(respawning)return;
-  respawning=18;$('fade-text').textContent=message;$('fade').hidden=false;
-  const el=$('fade');el.style.animation='none';void el.offsetWidth;el.style.animation='';
+  respawning=18;write('fade-text',message);const fade=$('fade');fade.hidden=false;
+  fade.style.animation='none';void fade.offsetWidth;fade.style.animation='';syncInput();
 }
-function levelEvents(events) {
+$('fade').addEventListener('animationend',()=>$('fade').hidden=true);
+function collectEvents(events) {
+  let victoryKind=null;
   for(const event of events) {
     const p=event.pickup?.position;
+    if(event.heal)current=core.heal(event.heal);
     if(event.type==='coin') {
-      current=core.heal(4);renderer.effects.burst(p,{count:10,speed:200,size:22,color:'#fff4b8',end:'#ffb020',life:.4});bump('coin-count');
+      renderer.effects.burst(p,{count:10,speed:200,size:22,color:'#fff4b8',end:'#ffb020',life:.4});bump('coin-count');
+      if(world.freeTravel) {
+        const count=session.route(event.pickup.route);
+        if(session.count('coin').found===session.count('coin').total)toast('Every coin found. Beautifully done!');
+        else if(count.found===count.total)toast(`${event.pickup.route} complete!`);
+      }
     } else if(event.type==='shard') {
       renderer.effects.burst(p,{count:22,speed:280,size:30,color:'#ffd0c8',end:'#ff2b1f',life:.6});bump('shard-count');
-      const shards=session.count('shard');toast(`Ember Shard ${shards.found} / ${shards.total}${event.pickup.hint?` · ${event.pickup.hint.split(':')[0]}`:''}`);
-    } else if(event.type==='reveal') {
-      toast('All eight shards! The Crimson Star burns on the lava altar below the landing.',5000);
-    } else if(event.type==='checkpoint') {
-      renderer.effects.ring([p[0],p[1],p[2]],{count:16,speed:260,rise:160,size:40,grow:60,color:'#ffe1a0',end:'#ff6a1f',glow:true,life:.7});
-      toast(`${event.first?'Beacon lit':'Checkpoint'} · ${event.checkpoint.name}`);$('tip-text').textContent=event.checkpoint.note;
-      zoneIndex=session.checkpoint;
-      document.querySelectorAll('[data-zone]').forEach((button,i)=>button.classList.toggle('active',i===zoneIndex));
+      const shards=session.count('shard');toast(`Ember Shard ${shards.found} of ${shards.total}`);
+    } else if(event.type==='reveal')toast('Every shard found! The Crimson Star waits on the lava altar.',5000);
+    else if(event.type==='checkpoint') {
+      renderer.effects.ring(p,{count:16,speed:260,rise:160,size:40,grow:60,color:'#ffe1a0',end:'#ff6a1f',glow:true,life:.7});
+      toast(`${event.first?'Checkpoint lit':'Checkpoint'} · ${event.checkpoint.name}`);
     } else if(event.type==='star'||event.type==='bonus') {
       renderer.effects.burst(p,{count:48,speed:420,size:40,color:'#fff6d0',end:event.type==='star'?'#ffb000':'#ff2b3a',life:1,up:200});
-      showVictory(event.type);
+      victoryKind=event.type;
     }
   }
+  if(victoryKind)showVictory(victoryKind);
 }
 function showVictory(kind) {
   const coins=session.count('coin'),shards=session.count('shard'),best=bestTime(kind==='star'?session.time:null);
-  $('victory-eyebrow').textContent=kind==='star'?'STAR GET · 1 OF 2':'STAR GET · CRIMSON';
-  $('victory-title').textContent=kind==='star'?'Ember Star claimed.':'Crimson Star claimed.';
-  $('victory-copy').textContent=kind==='star'
-    ?(shards.found===shards.total?'The summit is yours, and every shard with it. The Crimson Star waits on the altar.'
+  write('victory-eyebrow',`STAR GET · ${session.stars} OF 2`);
+  write('victory-title',kind==='star'?'Ember Star claimed.':'Crimson Star claimed.');
+  write('victory-copy',kind==='star'
+    ?(session.found.has('crimson-star')?'Both stars are yours. The caldera is conquered!':shards.found===shards.total?'The summit is yours. The Crimson Star waits on the lava altar.'
       :`The summit is yours${best?` · best ${formatTime(best)}`:''}. ${shards.total-shards.found} Ember Shards still hide in the caldera.`)
-    :'Every challenge in the caldera, conquered.';
-  $('victory-time').textContent=formatTime(session.time);$('victory-coins').textContent=`${coins.found} / ${coins.total}`;
-  $('victory-shards').textContent=`${shards.found} / ${shards.total}`;$('victory-deaths').textContent=session.deaths;
-  input.clear();setPaused(true);$('paused').hidden=true;victory.showModal();
+    :(session.found.has('ember-star')?'Both stars are yours. The caldera is conquered!':'Every shard is yours. The Ember Star still waits at the summit.'));
+  write('victory-time',formatTime(session.time));write('victory-coins',`${coins.found} / ${coins.total}`);
+  write('victory-shards',`${shards.found} / ${shards.total}`);write('victory-deaths',session.deaths);
+  victory.showModal();syncPause();
 }
 function bestTime(time) {
   try {
-    const previous=Number(localStorage.getItem('smooth64-caldera-best'))||null;
-    if(time&&(!previous||time<previous))localStorage.setItem('smooth64-caldera-best',time);
-    return previous&&time?Math.min(previous,time):previous||time;
+    const best=Number(localStorage.getItem('smooth64-caldera-best'))||null;
+    if(time&&(!best||time<best))localStorage.setItem('smooth64-caldera-best',time);
+    return best&&time?Math.min(best,time):best||time;
   } catch {return time;}
 }
 function tick() {
+  // Knockouts freeze the core until the shared checkpoint transition finishes.
+  if(respawning) {
+    session.tick({x:0,y:0,buttons:0});
+    if(--respawning===0)place(session.respawn(),{keepFade:true});
+    return !modalOpen();
+  }
   lastInput=input.sample(renderer.yaw);previous=current;
   if(renderer.shot&&(lastInput.buttons||Math.hypot(lastInput.x,lastInput.y)>7))renderer.shot=null;
   current=core.tick(lastInput);renderer.record(current);renderer.tick(previous,current,actions[previous.action],actionName());
-  if(mode==='caldera') {
-    session.tick(lastInput);
-    if(respawning) {
-      // Teleport while the fade is opaque; let it finish fading out on its own.
-      if(--respawning===0){place(session.respawn());$('fade').addEventListener('animationend',()=>$('fade').hidden=true,{once:true});}
-      return;
-    }
-    levelEvents(session.collect(current,actionName()));
-    if(current.health<256)respawn('Too bad!');
-    else if(current.position[1]<-1500||current.floor<-10000)respawn('Lost in the smoke');
-    return;
-  }
-  const reached=progress.collect(current,actionName());
-  if(reached.length) {
-    const route=reached.at(-1).route,count=progress.route(route);
-    toast(progress.found.size===progress.sparks.length?`All ${progress.sparks.length} sparks found. Beautifully done!`:
-      `${route} · ${count.found} / ${count.total} sparks${count.found===count.total?' · route complete!':''}`);
-  }
-  if(current.position[1]<-1500 || current.health<256 || current.floor<-10000) {
-    reset();toast('Back on your feet.');
-  }
+  session.tick(lastInput);
+  const reason=respawnReason(current);
+  if(reason)respawn(reason);else collectEvents(session.collect(current,actionName()));
+  return !modalOpen();
 }
-function openHelp() {
-  helpWasPaused=paused;if(started)setPaused(true);
-  input?.clear();help.showModal();
-}
+function step() {debugPaused=true;tick();renderAlpha=1;renderer.character.snap();syncInput();renderHud();}
 function command(key) {
-  if(help.open||victory.open)return;
-  if(key==='Slash'||key==='KeyH'){openHelp();return;}
-  if(!started) {if(key==='Space')start('caldera');return;}
-  if(key==='KeyR')reset();
-  if(key==='KeyP'||key==='Escape')setPaused(!paused);
-  if(key==='KeyT')toggleSlow();
-  if(key==='KeyV')toggleMesh();
-  if(key==='KeyN') {setPaused(true);tick();renderHud();}
+  if(help.open||victory.open) {
+    if(key==='Escape'){(help.open?help:victory).close();return true;}
+    return false;
+  }
+  if(key==='Escape'||key==='KeyP') {
+    if(!started){if(key==='Escape')start();}
+    else if(menu.open)menu.close();else openMenu();
+    return true;
+  }
+  if(key==='Slash'||key==='KeyH'){openHelp();return true;}
+  if(menu.open)return false;
+  if(!started){if(key==='Space'){start();return true;}return false;}
+  if(key==='KeyR'){reset();toast('Back at your checkpoint.');return true;}
+  if(settings.developer) {
+    if(key==='KeyT'){slow=!slow;applySettings();return true;}
+    if(key==='KeyV'){renderer.wire.visible=!renderer.wire.visible;applySettings();return true;}
+    if(key==='KeyN'){step();return true;}
+  }
+  return false;
 }
-function actionName() {return actions?.[current.action]||`ACT_${current.action.toString(16)}`;}
 function drawPowerMeter(health) {
-  const ctx=$('power-meter').getContext('2d'),wedges=Math.max(0,Math.min(8,Math.floor(health/256)));
-  ctx.clearRect(0,0,112,112);
-  ctx.beginPath();ctx.arc(56,56,50,0,Math.PI*2);ctx.fillStyle='#2a1418';ctx.fill();
-  const color=wedges>4?'#46c2ff':wedges>2?'#ffd24a':'#ff4a3a';
+  const wedges=healthWedges(health);if(wedges===meterWedges)return;meterWedges=wedges;
+  const meter=$('power-meter'),ctx=meter.getContext('2d');
+  meter.setAttribute('aria-label',`Power: ${wedges} of 8`);meter.title=`Power: ${wedges} / 8`;
+  ctx.clearRect(0,0,112,112);ctx.beginPath();ctx.arc(56,56,50,0,Math.PI*2);ctx.fillStyle='#151c21';ctx.fill();
+  const color=wedges>4?'#69cbd5':wedges>2?'#ffd24a':'#ff7059';
   for(let i=0;i<8;i++) {
     const a=-Math.PI/2+i*Math.PI/4;
     ctx.beginPath();ctx.moveTo(56,56);ctx.arc(56,56,44,a+.04,a+Math.PI/4-.04);ctx.closePath();
-    ctx.fillStyle=i<wedges?color:'#ffffff14';ctx.fill();
+    ctx.fillStyle=i<wedges?color:'#ffffff20';ctx.fill();
   }
-  ctx.beginPath();ctx.arc(56,56,17,0,Math.PI*2);ctx.fillStyle='#1a0d10';ctx.fill();
-  ctx.fillStyle='#fbead2';ctx.font='600 20px ui-monospace,monospace';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(wedges,56,57);
+  ctx.beginPath();ctx.arc(56,56,18,0,Math.PI*2);ctx.fillStyle='#151c21';ctx.fill();
+  ctx.fillStyle='#fff3dc';ctx.font='700 22px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(wedges,56,57);
 }
-function renderLevelHud() {
-  const coins=session.count('coin'),shards=session.count('shard'),stars=session.stars;
-  drawPowerMeter(current.health);
-  $('coin-count').textContent=coins.found;$('shard-count').textContent=shards.found;$('star-count').textContent=stars;
-  $('level-time').textContent=formatTime(session.time);
-  $('shard-total').textContent=`${shards.found} / ${shards.total}`;
+function renderMenu() {
+  const coins=session.count('coin'),shards=session.count('shard');
+  write('mission-title',world.name);write('menu-time',formatTime(session.time));
+  write('objective-summary',world.freeTravel?'Practice every move, follow the coins, and try the lava crossing. All destinations are open.':world.zones[session.checkpoint].note);
+  $('objectives').hidden=world.freeTravel;
+  write('menu-coins',`${coins.found} / ${coins.total} coins`);write('menu-deaths',`${session.deaths} retries`);
+  write('shard-total',`${shards.found} / ${shards.total}`);
   $('goal-star').classList.toggle('done',session.found.has('ember-star'));
-  $('goal-shards').classList.toggle('done',shards.found===shards.total);
+  $('goal-shards').classList.toggle('done',shards.total>0&&shards.found===shards.total);
   $('goal-bonus').classList.toggle('done',session.found.has('crimson-star'));
   $('goal-bonus').classList.toggle('locked',shards.found<shards.total);
-  document.querySelectorAll('[data-zone]').forEach((button,i)=>{
-    const lit=session.lit.has(`checkpoint-${zones[i].id}`);button.disabled=!lit;
-    button.querySelector('small').textContent=lit?'':'🔒';
+  document.querySelectorAll('[data-zone]').forEach((button,index)=>{
+    const zone=world.zones[index],count=session.route(zone.name),available=session.canVisit(index);
+    button.disabled=!available;button.classList.toggle('active',index===session.checkpoint);
+    if(index===session.checkpoint)button.setAttribute('aria-current','location');else button.removeAttribute('aria-current');
+    button.querySelector('small').textContent=!available?'Not reached':count.total?`${count.found}/${count.total} coins`:index===session.checkpoint?'Current':'';
   });
 }
 function renderHud() {
+  const coins=session.count('coin'),shards=session.count('shard'),stars=session.count('star').total+session.count('bonus').total;
+  drawPowerMeter(current.health);write('coin-count',coins.found);write('coin-total',`/${coins.total}`);
+  write('shard-count',shards.found);write('shard-max',`/${shards.total}`);$('shards-hud').hidden=!shards.total;
+  write('star-count',session.stars);write('star-max',`/${stars}`);$('stars-hud').hidden=!stars;
+  $('coins-hud').setAttribute('aria-label',`Coins: ${coins.found} of ${coins.total}`);
+  $('shards-hud').setAttribute('aria-label',`Ember Shards: ${shards.found} of ${shards.total}`);
+  $('stars-hud').setAttribute('aria-label',`Stars: ${session.stars} of ${stars}`);
+  write('level-time',formatTime(session.time));write('world-name',world.name);
+  write('checkpoint-name',`Checkpoint · ${world.zones[session.checkpoint].name}`);
+  const cue=settings.hints&&!paused()&&!respawning?actionCue(actionName(),current,renderer.yaw):'';
+  write('move-cue',cue);$('move-cue').hidden=!cue;
+  if(!settings.developer)return;
   const name=actionName().replace(/^ACT_/,'').toLowerCase().replaceAll('_',' ');
-  $('action-name').textContent=name[0].toUpperCase()+name.slice(1);
-  $('action-code').textContent=`0x${current.action.toString(16).toUpperCase().padStart(8,'0')}`;
-  $('animation-name').textContent=`${animationName(current.animation).toLowerCase().replaceAll('_',' ')} · ${current.frame}`;
-  $('speed').textContent=current.speed.toFixed(2);
-  $('speed-bar').style.width=`${Math.min(100,Math.abs(current.speed)/64*100)}%`;
-  $('height').textContent=Math.round(current.position[1]-current.floor);
-  $('vertical').textContent=current.velocity[1].toFixed(2);
-  $('tick').textContent=current.tick;
-  const cue=actionCue(actionName(),current,renderer.yaw);
-  $('move-cue').textContent=cue;$('move-cue').hidden=!cue;
-  if(mode==='caldera')renderLevelHud();
-  else {
-    $('spark-count').textContent=`${progress.found.size} / ${progress.sparks.length}`;
-    document.querySelectorAll('[data-zone]').forEach((button,i)=>{
-      const count=progress.route(zones[i].name),badge=button.querySelector('small');
-      if(badge)badge.textContent=count.total?`${count.found}/${count.total}`:'';
-    });
-  }
-  const ctx=$('stick-display').getContext('2d');
-  ctx.clearRect(0,0,100,100);ctx.strokeStyle=mode==='caldera'?'#f3e3cf40':'#193b3040';ctx.lineWidth=1.5;
-  ctx.beginPath();ctx.arc(50,50,34,0,Math.PI*2);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(13,50);ctx.lineTo(87,50);ctx.moveTo(50,13);ctx.lineTo(50,87);ctx.stroke();
-  ctx.fillStyle='#ed723d';ctx.beginPath();ctx.arc(50+lastInput.x/80*30,50-lastInput.y/80*30,6,0,Math.PI*2);ctx.fill();
+  write('action-name',name[0].toUpperCase()+name.slice(1));write('action-code',`0x${current.action.toString(16).toUpperCase().padStart(8,'0')}`);
+  write('animation-name',`${animationName(current.animation).toLowerCase().replaceAll('_',' ')} · ${current.frame}`);
+  write('speed',current.speed.toFixed(2));$('speed-bar').style.width=`${Math.min(100,Math.abs(current.speed)/64*100)}%`;
+  write('height',Math.round(current.position[1]-current.floor));write('vertical',current.velocity[1].toFixed(2));write('tick',current.tick);
+  const ctx=$('stick-display').getContext('2d');ctx.clearRect(0,0,100,100);ctx.strokeStyle='#243c3440';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.arc(50,50,34,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.moveTo(13,50);ctx.lineTo(87,50);ctx.moveTo(50,13);ctx.lineTo(50,87);ctx.stroke();
+  ctx.fillStyle='#d37537';ctx.beginPath();ctx.arc(50+lastInput.x/80*30,50-lastInput.y/80*30,6,0,Math.PI*2);ctx.fill();
 }
 function frame(now) {
-  const dt=Math.min((now-last)/1000||0,0.1);last=now;
-  let alpha=1;
-  const live=started&&!help.open&&!victory.open;
-  if(live) {
-    const delta=input.cameraDelta(dt);
-    renderer.yaw+=delta.yaw;
+  const dt=Math.min((now-last)/1000||0,.1);last=now;input.pollCommands();
+  if(started&&!modalOpen()) {
+    const delta=input.cameraDelta(dt);renderer.yaw+=delta.yaw;
     renderer.pitch=Math.max(.12,Math.min(1.25,renderer.pitch+delta.pitch));
     renderer.distance=Math.max(350,Math.min(3200,renderer.distance+delta.zoom));
-    if(!paused)alpha=clock.advance(dt*(slow?.25:1),tick);
+    if(!debugPaused) {
+      renderAlpha=clock.advance(dt*(slow?.25:1),tick);
+      if(modalOpen())renderAlpha=1;
+    }
   }
-  const view=mode==='caldera'?{found:session.found,lit:session.lit,revealed:session.revealed}:{found:progress.found};
-  renderer.draw(previous,current,alpha,dt,actionName(),actions[previous.action],view,live&&!paused?dt*(slow?.25:1):0);
+  const view={found:session.found,lit:session.lit,revealed:session.revealed};
+  renderer.draw(previous,current,renderAlpha,modalOpen()?0:dt,actionName(),actions[previous.action],view,paused()?0:dt*(slow?.25:1));
   if(started)renderHud();
   frames++;frameTime+=dt;
   if(frameTime>=1) {
-    $('render-stats').textContent=`30 Hz physics / ${Math.round(frames/frameTime)} fps / ${input.gamepadName}`;
+    if(settings.developer)write('render-stats',`30 Hz physics / ${Math.round(frames/frameTime)} fps / ${input.gamepadName}${debugPaused?' / frozen':''}`);
     frames=0;frameTime=0;
   }
   requestAnimationFrame(frame);
@@ -252,50 +265,42 @@ function frame(now) {
 
 $('start').addEventListener('click',()=>start('playground'));
 $('start-level').addEventListener('click',()=>start('caldera'));
-$('help-button').addEventListener('click',openHelp);
-$('close-help').addEventListener('click',()=>help.close());
-$('help-done').addEventListener('click',()=>help.close());
-help.addEventListener('close',()=>{if(started)setPaused(helpWasPaused);input?.clear();canvas.focus();});
-victory.addEventListener('close',()=>{setPaused(false);input?.clear();canvas.focus();});
+$('menu-button').addEventListener('click',openMenu);
+$('close-menu').addEventListener('click',()=>menu.close());
+$('resume-button').addEventListener('click',()=>{debugPaused=false;menu.close();});
+$('help-button').addEventListener('click',openHelp);$('menu-help').addEventListener('click',openHelp);
+$('close-help').addEventListener('click',()=>help.close());$('help-done').addEventListener('click',()=>help.close());
+for(const dialog of [menu,help,victory])dialog.addEventListener('close',()=>{syncPause();if(!modalOpen()&&started)canvas.focus();});
 $('victory-continue').addEventListener('click',()=>victory.close());
-$('victory-restart').addEventListener('click',()=>{victory.close();session.reset();reset(0);renderer.flyover(world.intro.from,world.intro.look);});
-$('restart-level').addEventListener('click',()=>{session.reset();reset(0);toast('A fresh start at the landing.');});
-$('reset-button').addEventListener('click',()=>reset());
-$('reset-sparks').addEventListener('click',()=>{progress.reset();renderHud();toast('Sparks are back. Try a new route.');canvas.focus();});
-$('pause-button').addEventListener('click',()=>{setPaused(!paused);canvas.focus();});
-$('step-button').addEventListener('click',()=>{setPaused(true);tick();renderHud();canvas.focus();});
-$('slow-button').addEventListener('click',()=>{toggleSlow();canvas.focus();});
-$('wire-button').addEventListener('click',()=>{toggleMesh();canvas.focus();});
-$('trail-button').addEventListener('click',()=>{
-  renderer.trail.visible=!renderer.trail.visible;$('trail-button').setAttribute('aria-pressed',renderer.trail.visible);canvas.focus();
+$('victory-restart').addEventListener('click',restartWorld);$('restart-world').addEventListener('click',restartWorld);
+$('reset-button').addEventListener('click',()=>{reset();menu.close();toast('Back at your checkpoint.');});
+$('freeze-button').addEventListener('click',()=>{debugPaused=!debugPaused;clock.reset();syncInput();canvas.focus();});
+$('step-button').addEventListener('click',()=>{step();canvas.focus();});
+$('slow-button').addEventListener('click',()=>{slow=!slow;applySettings();canvas.focus();});
+$('wire-button').addEventListener('click',()=>{renderer.wire.visible=!renderer.wire.visible;applySettings();canvas.focus();});
+$('trail-button').addEventListener('click',()=>{renderer.trail.visible=!renderer.trail.visible;applySettings();canvas.focus();});
+for(const key of Object.keys(settings))$(`setting-${key}`).addEventListener('change',e=>{
+  settings[key]=e.target.checked;saveSettings(settings);applySettings();
 });
-$('zones-toggle').addEventListener('click',()=>{
-  $('zone-list').hidden=!$('zone-list').hidden;$('zones-toggle').textContent=$('zone-list').hidden?'+':'−';
+for(const button of document.querySelectorAll('[data-mode]'))button.addEventListener('click',()=>{
+  if(button.dataset.mode!==mode){setMode(button.dataset.mode);toast(`Welcome back to ${world.name}.`);}
+  menu.close();
 });
-for(const tab of document.querySelectorAll('[data-mode]'))tab.addEventListener('click',()=>{if(tab.dataset.mode!==mode)setMode(tab.dataset.mode);canvas.focus();});
-window.addEventListener('blur',()=>{if(started&&!help.open&&!victory.open)setPaused(true);});
-document.addEventListener('visibilitychange',()=>{if(document.hidden&&started)setPaused(true);});
+window.addEventListener('blur',()=>{if(started&&!modalOpen())openMenu();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&started&&!modalOpen())openMenu();});
 
 try {
-  worlds={playground:{...createWorld(),kind:'playground'},caldera:createCaldera()};
-  worlds.playground.zones=playgroundZones;world=worlds.playground;
-  progress=new CourseProgress(worlds.playground.sparks);
+  worlds={playground:createWorld(),caldera:createCaldera()};
+  sessions=Object.fromEntries(Object.entries(worlds).map(([key,value])=>[key,new LevelSession(value)]));
   const [wasm,actionResponse]=await Promise.all([fetch('smooth64.wasm'),fetch('actions.json')]);
-  if(!wasm.ok||!actionResponse.ok)throw new Error('Could not load the movement files. Serve the web folder over HTTP.');
+  if(!wasm.ok||!actionResponse.ok)throw new Error('Could not load the game files.');
   [core,actions]=await Promise.all([wasm.arrayBuffer().then(loadCore),actionResponse.json()]);
-  core.loadWorld(world.triangles);
-  renderer=new PlaygroundRenderer(canvas,world);
-  input=new Input(canvas,command);
-  current=core.reset(zones[0].position,zones[0].yaw);previous=current;
-  buildZoneList();
-  for(const tab of document.querySelectorAll('[data-mode]'))tab.setAttribute('aria-selected',tab.dataset.mode===mode);
-  $('start').disabled=false;$('start').innerHTML='Movement playground <span>↗</span>';
-  $('start-level').disabled=false;
-  $('status').innerHTML='<i></i>Playground ready';
-  requestAnimationFrame(frame);
+  renderer=new PlaygroundRenderer(canvas);input=new Input(canvas,command);setMode('caldera');
+  renderer.camera.position.set(2700,4000,6200);renderer.camera.lookAt(0,1700,0);
+  $('start').disabled=false;$('start-level').disabled=false;$('menu-button').disabled=false;
+  write('status','Ready when you are.');requestAnimationFrame(frame);
 } catch(error) {
-  console.error(error);$('status').textContent='Unable to start';
-  $('welcome').querySelector('p').textContent=`${error.message} Use a browser with WebGL 2 and WebAssembly enabled.`;
-  $('start').textContent='Reload playground';$('start').disabled=false;
-  $('start').addEventListener('click',()=>location.reload());
+  console.error(error);write('status','Unable to start');
+  $('welcome').querySelector('p').textContent=`${error.message} Try reloading in a browser with WebGL 2 and WebAssembly.`;
+  write('start','Reload game');$('start').disabled=false;$('start').addEventListener('click',()=>location.reload());
 }

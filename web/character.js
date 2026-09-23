@@ -50,13 +50,19 @@ export class ExplorerRig extends T.Group {
       feet:this.feet.map(f=>[f.position.clone(),f.rotation.x]),eyes:this.eyes[0].scale.y};
   }
   animate(previous,current,alpha,previousName,currentName,dt) {
-    const a=poseFor(previous,previousName),b=poseFor(current,currentName);
+    const b=poseFor(current,currentName);
+    const anchored=name=>name?.includes('LEDGE')||name?.includes('HANG');
+    const contact=anchored(currentName);
+    const a=contact&&!anchored(previousName)?b:poseFor(previous,previousName);
     // Only a live render (with a frame time) blends between actions. Direct
     // sampling stays exact, and pauses/steps freeze the blend where it is.
     const key=`${currentName}:${current.animation}`,live=dt!==undefined;
-    const from=live&&this.poseKey&&key!==this.poseKey&&!currentName.includes('LEDGE_GRAB')?this.capture():null;
+    const from=live&&!contact&&this.poseKey&&key!==this.poseKey?this.capture():null;
     if(live) {
       this.poseKey=key;
+      // Contact constraints win over an unfinished airborne/crouching blend.
+      // Blending these channels lets gloves slide off the ledge or ceiling.
+      if(contact)this.fade=null;
       // A restart still advances this frame, so keys that change on
       // consecutive ticks keep converging instead of holding the snapshot.
       if(from)this.fade={from,t:0};

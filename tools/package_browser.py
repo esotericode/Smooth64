@@ -49,7 +49,7 @@ def package():
     html = html.replace('<script type="module" src="main.js"></script>',
                         '<script type="module">' + script + '</script>')
     html = html.replace('href="./"', 'href="#"')
-    html = html.replace('<title>Smooth64 — Movement playground</title>',
+    html = html.replace('<title>Smooth64 — Cinder Caldera</title>',
                         '<title>Smooth64 — Play offline</title>')
     # Keep license notices with the one-file deliverable as well as the ZIP.
     notices = (ROOT / "LICENSE").read_text() + '\n\n' + (ROOT / "THIRD_PARTY.md").read_text()
@@ -62,13 +62,14 @@ def package():
 
 1. Extract this ZIP (right-click it, then Extract All on Windows).
 2. Double-click Smooth64-Play.html.
-3. Click Cinder Caldera (the level) or Movement playground.
+3. Click Play Cinder Caldera, or Visit the playground.
 
 If asked which app to use, choose Microsoft Edge, Chrome, or Firefox.
 No installation, account, internet connection, Python, terminal, or ROM needed.
 
 WASD / arrow keys: move    Space: jump    Shift: crouch    J: attack/dive
-Drag the view: camera     R: reset       Controls button: full move guide
+Drag the view: camera     R: checkpoint  Controls button: full move guide
+Escape / P: pause menu    Gamepad Start: pause menu
 
 Long jump: run, press Shift, then Space.
 Backflip: stand still, hold Shift, then Space.
@@ -83,8 +84,15 @@ wedges of health; coins heal one. Touch beacons to set your checkpoint (R return
 there). Eight red Ember Shards hide behind optional challenges; all eight light
 the Crimson Star on the lava altar.
 
-PLAYGROUND: areas 07-10 are the trails: ledges, wall kicks, skyline jumps, and a
-canopy. Find all 15 gold sparks.
+PLAYGROUND: eleven practice areas, including the new lava crossing. Find 34
+healing coins across the original courses and trails. Menu > Practice destinations
+opens every area. Power, coins, lava and checkpoint recovery work as in the level.
+
+SETTINGS: the default view shows your power and collectibles. Open Menu for
+destinations, objectives, movement hints and the optional timer. Enable Developer
+tools for action/velocity readouts, frame stepping, slow motion, trails and mesh.
+Your settings are remembered. Each world's progress survives switching worlds
+and checkpoint retries until you choose Start this world over or reload.
 
 The game pauses when you switch windows. Press P to resume.
 Requires a browser with WebGL 2 and WebAssembly enabled.

@@ -2,7 +2,8 @@
 // Rendering and collision consume these SAME integer triangles, like world.js.
 // Coordinates are SM64 units, Y up. The lake floor is SURFACE_BURNING (0x01),
 // so the core's own lava boost applies: three wedges of damage and a launch.
-export const LAVA=0x01,HANGABLE=0x05,VERY_SLIPPERY=0x13;
+import {SURFACE} from './rules.js';
+export const {LAVA,HANGABLE,VERY_SLIPPERY}=SURFACE;
 const GLOW_LINE=240;
 // The crater wall: 36 jittered vertices around the lake. Shared with the scene.
 const rimVertex=i=>5750+(((i%36)*73)%9-4)*55;

@@ -33,19 +33,14 @@ export function decoratePlayground(group,world) {
   groundText(group,'08  /  WALL-KICK TOWER',-2200,4,-4300,1800);
   groundText(group,'09  /  SKYLINE CIRCUIT',1500,4,-3800,1800);
   groundText(group,'10  /  CANOPY WALK',2200,4,3670,1600);
+  groundText(group,'11  /  LAVA CROSSING',-2600,4,3300,1450);
   for(const [x,z,w,d] of [[-5000,300,2300,3900],[0,-5350,7500,3000],[2200,4800,1900,1900]]) {
     const border=new T.LineLoop(new T.BufferGeometry().setFromPoints([
       new T.Vector3(x-w/2,3,z-d/2),new T.Vector3(x+w/2,3,z-d/2),
       new T.Vector3(x+w/2,3,z+d/2),new T.Vector3(x-w/2,3,z+d/2)
     ]),new T.LineBasicMaterial({color:'#ecf0ce'}));group.add(border);
   }
-  for(const zone of world.zones.slice(6)) {
-    const [x,y,z]=zone.position;
-    const marker=new T.Mesh(new T.RingGeometry(110,123,48),new T.MeshBasicMaterial({color:'#537d6b',side:T.DoubleSide}));
-    marker.rotation.x=-Math.PI/2;marker.position.set(x,y+3,z);group.add(marker);
-  }
-  const ring=new T.Mesh(new T.RingGeometry(130,145,64),new T.MeshBasicMaterial({color:'#537d6b',side:T.DoubleSide}));
-  ring.rotation.x=-Math.PI/2;ring.position.set(0,4,2350);group.add(ring);
+  // Destination beacons are drawn by the shared pickup renderer.
   const rail=new T.LineLoop(new T.BufferGeometry().setFromPoints([
     new T.Vector3(-3730,3,-3730),new T.Vector3(3730,3,-3730),new T.Vector3(3730,3,3730),new T.Vector3(-3730,3,3730)
   ]),new T.LineBasicMaterial({color:'#ecf0ce'}));group.add(rail);

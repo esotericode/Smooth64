@@ -14,7 +14,17 @@ Works offline in Edge, Chrome, or Firefox. No installation, Python, terminal, co
 The original recovery ZIP is kept in this repository. The folders below contain the editable project source.
 
 
-A ROM-free movement playground built around the actual Super Mario 64 US action code, with an original capsule character and an original test level.
+A ROM-free platformer built around the Super Mario 64 US movement code, with an original explorer, a volcanic adventure, and a connected practice playground.
+
+## Game polish — one set of rules, a quieter screen
+
+The default view shows **power and collectibles**. Open **Menu** (Escape, P, or gamepad Start) for objectives, checkpoint travel, world selection, and settings. **Developer tools** is off by default: turn it on for action/animation readouts, input display, frame stepping, slow motion, trails, and collision mesh. Movement hints and the on-screen timer have separate settings. Settings are remembered when browser storage is available.
+
+Both worlds now use the same coins, healing, power meter, checkpoint beacons, pickup effects, and recovery rules. The playground's fifteen former sparks are coins, with more coins in the original six courses and a new **Lava crossing** practice bay: **34 coins across eleven destinations**. The original ten courses retain their collision geometry. Lava costs three power wedges; each coin heals one.
+
+Each world's collected items, timer, and checkpoints survive switching worlds and retries. Switching returns you to that world's checkpoint with full power. **Start this world over** resets only that world's progress; reloading resets both runs. Caldera checkpoints unlock as you reach them; all playground destinations are always available.
+
+Movement polish keeps gloves anchored through live ledge transitions and plants the running stance foot while the torso leans and bobs. Menus clear held/queued input, pause simulation and animation, and stop multi-tick catch-up immediately when a star is collected. Gamepad Start and touch cancellation follow the same pause/input rules.
 
 ## Third edition — Cinder Caldera
 
@@ -45,7 +55,7 @@ The character's animation also got a review pass:
 
 The explorer now has orb gloves and little shoes, with procedural running, punching, kicking, flipping, diving, sliding, landing, hanging, and climbing poses. Ledge hangs place the body below the platform and keep the gloves planted at the lip. A camera-relative arrow shows which way to push to climb.
 
-The six original areas are joined by **Ledge garden**, **Wall-kick tower**, **Skyline circuit**, and **Canopy walk**. Find **15 gold sparks** across the new routes; progress survives respawns until you reset the sparks or reload. Destination buttons jump directly to each area. The movement core and its compiled WASM are unchanged from the first edition. This release integrates the parallel animation/rendering work into a compact, connected course; see [merge decisions](docs/MERGE_NOTES.md).
+The second edition added **Ledge garden**, **Wall-kick tower**, **Skyline circuit**, and **Canopy walk** to the original six areas. Its fifteen gold sparks are now healing coins; destinations are available in the pause menu. The movement core and its compiled WASM are unchanged from the first edition. This release integrates the parallel animation/rendering work into a compact, connected course; see [merge decisions](docs/MERGE_NOTES.md).
 
 [Second-edition release notes](docs/releases/v0.2.0.md)
 
@@ -63,7 +73,7 @@ Open **http://localhost:8000** and select **Cinder Caldera** or **Movement playg
 
 Python 3 and a current browser with WebGL 2/WebAssembly are all you need. The compiled movement core and renderer are included. No npm install, compiler, ROM, CDN, or account is needed to play. Opening `index.html` directly as a `file:` URL will not work; use the local server. The `web/` directory is also a complete static build suitable for a normal HTTP server.
 
-The playground contains a runway, walkable ramps, a steep slippery slope, a wall-kick corridor, stairs, ledges, separated platforms, a low ceiling, and a hangable ceiling. Use the destination panel to move between experiments. Reset, pause, single-tick stepping, quarter speed, trajectory trails, collision wireframes, and live action/velocity/stick readouts are built in.
+The playground contains a runway, walkable ramps, a steep slippery slope, a wall-kick corridor, stairs, ledges, separated platforms, a low ceiling, and a hangable ceiling. Use **Menu → Practice destinations** to move between experiments. Enable **Menu → Settings → Developer tools** for single-tick stepping, quarter speed, trajectory trails, collision wireframes, and live movement readouts.
 
 | Control | Keyboard | Standard gamepad |
 |---|---|---|
@@ -74,10 +84,10 @@ The playground contains a runway, walkable ramps, a steep slippery slope, a wall
 | Crouch / Z | Shift or Z | Either trigger |
 | Camera | Drag or Q/E; wheel to zoom | Right stick |
 | Reset (level: last checkpoint) | R | On-screen button |
-| Pause / resume | P or Escape | On-screen button |
-| Advance one tick | N | On-screen button |
-| Quarter speed | T | On-screen button |
-| Collision mesh | V | On-screen button |
+| Pause / menu | P or Escape | Start |
+| Advance one tick (developer tools) | N | On-screen button |
+| Quarter speed (developer tools) | T | On-screen button |
+| Collision mesh (developer tools) | V | On-screen button |
 | Move guide | ? or H | Controls button |
 
 Touch devices get an analog pad and A/B/Z buttons. Keyboard buttons retain very short taps until the next simulation tick. Gamepad input is sampled on simulation ticks. Losing window focus pauses the simulation and clears keyboard input.
@@ -125,6 +135,17 @@ node --test tests/*.test.mjs
 # Or run the full suite (no npm packages are installed):
 npm test
 ```
+
+Optional browser checks (desktop, touch layout, menus, world progress, settings, and the offline package):
+
+```sh
+npm install --no-save playwright
+npx playwright install chromium
+python3 tools/package_browser.py
+npm run test:browser
+```
+
+The browser check writes review screenshots under `build/browser-checks/`. Set `BROWSER_EXECUTABLE_PATH` to use an existing Chromium executable. Playwright is only needed for this optional check; playing the game and running the movement suite still need no npm packages.
 
 Rebuild the checked-in browser core with [WASI SDK 25](https://github.com/WebAssembly/wasi-sdk/releases/tag/wasi-sdk-25):
 

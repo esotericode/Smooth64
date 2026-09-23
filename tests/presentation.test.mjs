@@ -95,3 +95,35 @@ test('slide kick is low and feet-first; decelerating keeps striding; ground poun
   const knock=poseFor({...state,action:0x00020460,animation:1,frame:30,speed:-20},'ACT_HARD_BACKWARD_GROUND_KB');
   assert.ok(knock.rotation[0]<-.8,'fall damage topples backward instead of running');
 });
+
+test('grabbing a ledge cancels a live crossfade and keeps gloves anchored through pull-up',()=>{
+  const rig=new ExplorerRig(),idle={...state,action:0x0C400201,animation:197,frame:0},crouch={...idle,action:0x0C008220,animation:152};
+  rig.animate(idle,idle,1,'ACT_IDLE','ACT_IDLE',1/60);
+  rig.animate(crouch,crouch,1,'ACT_CROUCHING','ACT_CROUCHING',1/60);
+  assert.ok(rig.fade,'a blend is in flight');
+  rig.position.set(...state.position);rig.rotation.y=Math.PI;
+  rig.animate(crouch,state,.2,'ACT_CROUCHING','ACT_LEDGE_GRAB',1/60);
+  assert.equal(rig.fade,null);
+  const anchors=rig.hands.map(h=>h.getWorldPosition(new Vector3()));
+  assert.deepEqual(anchors.map(v=>Math.round(v.y)),[305,305]);
+  let previous=state,previousName='ACT_LEDGE_GRAB';
+  for(let frame=0;frame<=10;frame++) {
+    const climb={...state,animation:0,frame};
+    for(const alpha of [.2,.7,1]) {
+      rig.animate(previous,climb,alpha,previousName,'ACT_LEDGE_CLIMB_SLOW_1',1/60);
+      for(let i=0;i<2;i++)assert.ok(rig.hands[i].getWorldPosition(new Vector3()).distanceTo(anchors[i])<1e-5,`glove ${i}, frame ${frame}`);
+    }
+    previous=climb;previousName='ACT_LEDGE_CLIMB_SLOW_1';
+  }
+});
+
+test('the running stance sole stays grounded while the torso leans and bobs',()=>{
+  const rig=new ExplorerRig();
+  for(const name of ['ACT_WALKING','ACT_DECELERATING'])for(const speed of [8,16,32])for(let frame=0;frame<30;frame++) {
+    const s={...state,position:[0,0,0],yaw:0,action:0x04000440,animation:72,frame,speed};
+    rig.animate(s,s,1,name,name);
+    const bottoms=rig.feet.map(foot=>new Box3().setFromObject(foot).min.y);
+    assert.ok(bottoms.every(y=>y>-.5),`${name} ${speed}, ${frame}: sole under floor: ${bottoms}`);
+    assert.ok(Math.min(...bottoms)<4,`${name} ${speed}, ${frame}: both soles floating: ${bottoms}`);
+  }
+});

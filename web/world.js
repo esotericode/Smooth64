@@ -1,5 +1,6 @@
 // Original Smooth64 geometry. Rendering and collision consume these SAME triangles.
 // All coordinates use SM64 units; Y is up. No imported level assets.
+import {SURFACE} from './rules.js';
 export const zones = [
   { section: 'THE ORIGINAL PLAYGROUND', name: 'The runway', note: 'Build speed. Chain three jumps.', position: [0, 0, 2350], yaw: 32768, camera: 0 },
   { name: 'Slope studies', note: 'Feel acceleration change with the slope.', position: [-2200, 0, 900], yaw: 32768, camera: 0 },
@@ -7,11 +8,12 @@ export const zones = [
   { name: 'Step by step', note: 'Try ledge grabs, backflips and short hops.', position: [-2850, 0, 2500], yaw: 16384, camera: -Math.PI / 2 },
   { name: 'Island hopping', note: 'Crouch while running, then jump across.', position: [100, 440, -2300], yaw: 16384, camera: -Math.PI / 2 },
   { name: 'Slippery business', note: 'A steep, very slippery surface.', position: [-3000, 800, -2450], yaw: 0, camera: Math.PI },
-  { section: 'THE NEW TRAILS', name: 'Ledge garden', note: 'Three ledges, three sparks. Push toward the ledge to climb.', position: [-5000, 0, 1675], yaw: 32768, camera: 0 },
+  { section: 'THE TRAILS', name: 'Ledge garden', note: 'Three ledges, three coins. Push toward the ledge to climb.', position: [-5000, 0, 1675], yaw: 32768, camera: 0 },
   { name: 'Wall-kick tower', note: 'Alternate walls with A / Space. Aim toward the high rear terrace.', position: [-2200, 0, -4980], yaw: -16384, camera: Math.PI / 2 },
-  { name: 'Skyline circuit', note: 'Follow six sparks. Running long jumps will bridge the larger gaps.', position: [0, 280, -4230], yaw: 16384, camera: -Math.PI / 2 },
+  { name: 'Skyline circuit', note: 'Follow six coins. Running long jumps will bridge the larger gaps.', position: [0, 280, -4230], yaw: 16384, camera: -Math.PI / 2 },
   { name: 'Canopy walk', note: 'Hold A / Space to catch the golden canopy. Keep holding as you cross.', position: [2200, 260, 4050], yaw: 0, camera: Math.PI },
-];
+  { section: 'HAZARD PRACTICE', name: 'Lava crossing', note: 'Lava costs three wedges. Jump to the islands; coins restore one wedge each.', position: [-2800, 0, 3500], yaw: 0, camera: Math.PI },
+].map((zone,index)=>({...zone,id:`practice-${index+1}`}));
 
 export function createWorld() {
   const triangles = [];
@@ -19,8 +21,8 @@ export function createWorld() {
   let groupStart=0;
   // One mesh per course section, adapted from the parallel branch. Grouping
   // changes rendering only; collision triangles retain their original order.
-  function group() {
-    if(triangles.length>groupStart)shapes.push({start:groupStart,end:triangles.length});
+  function group(style) {
+    if(triangles.length>groupStart)shapes.push({start:groupStart,end:triangles.length,style});
     groupStart=triangles.length;
   }
   function face(points, color, type, normal) {
@@ -54,8 +56,8 @@ export function createWorld() {
   box(-2200,0,-1610,1200,650,420,'#c4d2b7');
   group();
   // A steep slide, plus its upper landing.
-  ramp(-3000,-1700,600,1200,800,'#8aada8',0x13);
-  box(-3000,0,-2450,600,800,300,'#8aada8',0x13);
+  ramp(-3000,-1700,600,1200,800,'#8aada8',SURFACE.VERY_SLIPPERY);
+  box(-3000,0,-2450,600,800,300,'#8aada8',SURFACE.VERY_SLIPPERY);
   group();
   // Two tall, solid walls with enough room to kick between them.
   box(1740,0,-200,180,1050,1900,'#bfc5b6');
@@ -73,7 +75,7 @@ export function createWorld() {
   // Low ceiling, with a hangable underside, and crouch tunnel.
   box(3000,0,1600,120,370,800,'#adbba9');
   box(3600,0,1600,120,370,800,'#adbba9');
-  box(3300,300,1600,720,100,800,'#adbba9',5);
+  box(3300,300,1600,720,100,800,'#adbba9',SURFACE.HANGABLE);
   box(900,125,1550,600,100,700,'#c4d2b7');
   group();
   // New wings meet the original slab edge-to-edge. Missed jumps have a recovery
@@ -83,7 +85,7 @@ export function createWorld() {
   group();
   const sparks=[];
   function spark(route,x,y,z) {
-    sparks.push({id:`${route}-${sparks.filter(s=>s.route===route).length+1}`,route,position:[x,y,z]});
+    sparks.push({kind:'coin',id:`${route}-${sparks.filter(s=>s.route===route).length+1}`,route,position:[x,y,z]});
   }
   // 270-unit rises: arrive below the lip, hang, then pull up.
   for(const [z,height,width,depth] of [[750,300,900,650],[-150,570,780,550],[-1050,840,650,500]]) {
@@ -114,7 +116,7 @@ export function createWorld() {
   // arena and given a clear start, overhead traverse, and landing shelf.
   box(2200,-240,4800,2000,240,2000,'#d3d8cc');
   box(2200,0,4050,700,260,400,'#c4d2b7');
-  box(2200,560,4700,700,80,1000,'#c2ab7a',5);
+  box(2200,560,4700,700,80,1000,'#c2ab7a',SURFACE.HANGABLE);
   box(1850,0,4700,120,640,1000,'#adbba9');
   box(2550,0,4700,120,640,1000,'#adbba9');
   box(2200,0,5280,900,380,500,'#b2c7ba');
@@ -122,5 +124,32 @@ export function createWorld() {
   spark('Canopy walk',2200,470,4775);
   spark('Canopy walk',2200,465,5380);
   group();
-  return {triangles,shapes,zones,sparks};
+
+  // A connected practice bay uses the exact burning floor and coin rules of
+  // Cinder Caldera. The original ten courses keep their collision geometry.
+  box(-3500,-240,4750,300,240,1900,'#dfcdb1');
+  box(-450,-240,4750,300,240,1900,'#dfcdb1');
+  box(-1975,-240,5700,3350,240,300,'#dfcdb1');
+  for(const [x,z,top] of [[-2800,4200,160],[-1850,4480,180],[-900,5000,220]])
+    box(x,-240,z,560,top+240,560,'#b2c7ba');
+  group();
+  face([[-3350,-160,3800],[-600,-160,3800],[-600,-160,5550],[-3350,-160,5550]],'#ff6a1a',SURFACE.LAVA,[0,1,0]);
+  group('lava');
+
+  const pickups=[...sparks];
+  const coinRoutes=[
+    [[0,85,1950],[0,85,1400],[0,85,800]],
+    [[-2200,270,100],[-2200,735,-1600]],
+    [[2150,85,400],[2150,500,-300]],
+    [[-2080,285,2500],[-1440,485,2500],[-800,685,2500]],
+    [[1000,525,-2480],[1850,585,-2780],[2780,665,-2780]],
+    [[-3000,885,-2420],[-3000,485,-1700]],
+  ];
+  for(const [index,points] of coinRoutes.entries())points.forEach((position,i)=>
+    pickups.push({kind:'coin',id:`coin-practice-${index+1}-${i+1}`,route:zones[index].name,position}));
+  [[-2800,245,4200],[-1850,265,4480],[-900,305,5000],[-900,85,5700]].forEach((position,i)=>
+    pickups.push({kind:'coin',id:`coin-lava-${i+1}`,route:'Lava crossing',position}));
+  for(const zone of zones)pickups.push({kind:'checkpoint',id:`checkpoint-${zone.id}`,position:zone.position});
+  return {kind:'playground',name:'Movement Playground',triangles,shapes,zones,checkpoints:zones,freeTravel:true,pickups,
+    sparks}; // Legacy route tools can still inspect the original fifteen locations.
 }
