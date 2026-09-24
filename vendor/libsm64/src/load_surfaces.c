@@ -134,9 +134,10 @@ static void engine_surface_from_lib_surface( struct SM64SurfaceCollisionData *su
     }
 
     // (v2 - v1) x (v3 - v2)
-    nx = (y2 - y1) * (z3 - z2) - (z2 - z1) * (y3 - y2);
-    ny = (z2 - z1) * (x3 - x2) - (x2 - x1) * (z3 - z2);
-    nz = (x2 - x1) * (y3 - y2) - (y2 - y1) * (x3 - x2);
+    // Smooth64: 64-bit products; in s32 a large triangle's normal wrapped and could flip.
+    nx = (s64)(y2 - y1) * (z3 - z2) - (s64)(z2 - z1) * (y3 - y2);
+    ny = (s64)(z2 - z1) * (x3 - x2) - (s64)(x2 - x1) * (z3 - z2);
+    nz = (s64)(x2 - x1) * (y3 - y2) - (s64)(y2 - y1) * (x3 - x2);
     mag = sqrtf(nx * nx + ny * ny + nz * nz);
 
     // Could have used min_3 and max_3 for this...
@@ -229,6 +230,123 @@ struct SM64SurfaceCollisionData *loaded_surface_iter_get_at_index( uint32_t grou
     return &s_surface_object_list[ groupIndex - 1 ].engineSurfaces[ surfaceIndex ];
 }
 
+/* Smooth64: a grid over the static surfaces, as the original game kept (its
+ * cells were 1,024 units over a fixed 16,384-unit square); libsm64 scanned
+ * every surface instead, so each query cost grew with the world. Each cell
+ * lists, in load order, every surface whose bounds widened by GRID_REACH
+ * touch it. A floor or ceiling lookup needs its point inside the surface's
+ * bounds, and a wall check reaches at most 200 / cos 45 = 283 units from
+ * them, so a cell holds every static surface a query there could match, in
+ * the order the full scan met them: collision results are unchanged. */
+#define GRID_REACH 512
+static s64 s_grid_x0, s_grid_z0, s_grid_size;
+static uint32_t s_grid_w, s_grid_h;
+static uint32_t *s_grid_start = NULL, *s_grid_items = NULL;
+
+static void grid_span( const struct SM64SurfaceCollisionData *s, s64 *x0, s64 *x1, s64 *z0, s64 *z1 )
+{
+    s64 minX = s->vertex1[0], maxX = minX, minZ = s->vertex1[2], maxZ = minZ;
+    const int32_t *v[2] = { s->vertex2, s->vertex3 };
+    for( int k = 0; k < 2; ++k )
+    {
+        if( v[k][0] < minX ) minX = v[k][0];
+        if( v[k][0] > maxX ) maxX = v[k][0];
+        if( v[k][2] < minZ ) minZ = v[k][2];
+        if( v[k][2] > maxZ ) maxZ = v[k][2];
+    }
+    *x0 = (minX - GRID_REACH - s_grid_x0) / s_grid_size;
+    *x1 = (maxX + GRID_REACH - s_grid_x0) / s_grid_size;
+    *z0 = (minZ - GRID_REACH - s_grid_z0) / s_grid_size;
+    *z1 = (maxZ + GRID_REACH - s_grid_z0) / s_grid_size;
+}
+
+static void grid_free( void )
+{
+    free( s_grid_start );
+    free( s_grid_items );
+    s_grid_start = s_grid_items = NULL;
+    s_grid_w = s_grid_h = 0;
+}
+
+static void grid_build( void )
+{
+    s64 minX = 0, maxX = 0, minZ = 0, maxZ = 0, x0, x1, z0, z1;
+    int any = 0;
+
+    grid_free();
+    for( uint32_t i = 0; i < s_static_surface_count; ++i )
+    {
+        const struct SM64SurfaceCollisionData *s = &s_static_surface_list[i];
+        if( !s->isValid ) continue;
+        const int32_t *v[3] = { s->vertex1, s->vertex2, s->vertex3 };
+        for( int k = 0; k < 3; ++k )
+        {
+            if( !any || v[k][0] < minX ) minX = v[k][0];
+            if( !any || v[k][0] > maxX ) maxX = v[k][0];
+            if( !any || v[k][2] < minZ ) minZ = v[k][2];
+            if( !any || v[k][2] > maxZ ) maxZ = v[k][2];
+            any = 1;
+        }
+    }
+    if( !any ) return;
+    s_grid_x0 = minX - GRID_REACH;
+    s_grid_z0 = minZ - GRID_REACH;
+
+    // Cells start at the original's 1,024 units and double until the grid,
+    // and the lists of surfaces that cover many cells, stay small.
+    for( s_grid_size = 1024;; s_grid_size *= 2 )
+    {
+        s64 w = (maxX + GRID_REACH - s_grid_x0) / s_grid_size + 1, h = (maxZ + GRID_REACH - s_grid_z0) / s_grid_size + 1, entries = 0;
+        if( w * h > (1 << 20) ) continue;
+        for( uint32_t i = 0; i < s_static_surface_count; ++i )
+        {
+            if( !s_static_surface_list[i].isValid ) continue;
+            grid_span( &s_static_surface_list[i], &x0, &x1, &z0, &z1 );
+            entries += (x1 - x0 + 1) * (z1 - z0 + 1);
+        }
+        if( w * h > 1 && entries > 64 * (s64)s_static_surface_count + (1 << 16) ) continue;
+        s_grid_w = (uint32_t)w;
+        s_grid_h = (uint32_t)h;
+        break;
+    }
+
+    uint32_t cells = s_grid_w * s_grid_h, *fill;
+    s_grid_start = calloc( cells + 1, sizeof( uint32_t ));
+    fill = malloc( cells * sizeof( uint32_t ));
+    if( s_grid_start == NULL || fill == NULL ) { free( fill ); grid_free(); return; }
+    for( uint32_t i = 0; i < s_static_surface_count; ++i )
+    {
+        if( !s_static_surface_list[i].isValid ) continue;
+        grid_span( &s_static_surface_list[i], &x0, &x1, &z0, &z1 );
+        for( s64 z = z0; z <= z1; ++z ) for( s64 x = x0; x <= x1; ++x ) s_grid_start[z * s_grid_w + x + 1]++;
+    }
+    for( uint32_t c = 0; c < cells; ++c ) s_grid_start[c + 1] += s_grid_start[c];
+    s_grid_items = malloc( s_grid_start[cells] * sizeof( uint32_t ) + 1 );
+    if( s_grid_items == NULL ) { free( fill ); grid_free(); return; }
+    memcpy( fill, s_grid_start, cells * sizeof( uint32_t ));
+    for( uint32_t i = 0; i < s_static_surface_count; ++i )
+    {
+        if( !s_static_surface_list[i].isValid ) continue;
+        grid_span( &s_static_surface_list[i], &x0, &x1, &z0, &z1 );
+        for( s64 z = z0; z <= z1; ++z ) for( s64 x = x0; x <= x1; ++x ) s_grid_items[fill[z * s_grid_w + x]++] = i;
+    }
+    free( fill );
+}
+
+/* Smooth64: the static surfaces a query at [x, z] could match, in load order.
+ * Without a grid (out of memory, or no valid surfaces), *items is NULL and the
+ * count covers every static surface. */
+uint32_t loaded_static_cell( f32 x, f32 z, const uint32_t **items )
+{
+    *items = NULL;
+    if( s_grid_start == NULL ) return s_static_surface_count;
+    double cx = floor(( (double)x - s_grid_x0 ) / s_grid_size ), cz = floor(( (double)z - s_grid_z0 ) / s_grid_size );
+    if( !( cx >= 0 && cx < s_grid_w && cz >= 0 && cz < s_grid_h )) return 0;
+    uint32_t c = (uint32_t)cz * s_grid_w + (uint32_t)cx;
+    *items = s_grid_items + s_grid_start[c];
+    return s_grid_start[c + 1] - s_grid_start[c];
+}
+
 void surfaces_load_static( const struct SM64Surface *surfaceArray, uint32_t numSurfaces )
 {
     if( s_static_surface_list != NULL )
@@ -239,6 +357,7 @@ void surfaces_load_static( const struct SM64Surface *surfaceArray, uint32_t numS
 
     for( int i = 0; i < numSurfaces; ++i )
         engine_surface_from_lib_surface( &s_static_surface_list[i], &surfaceArray[i], NULL );
+    grid_build();
 }
 
 uint32_t surfaces_load_object( const struct SM64SurfaceObject *surfaceObject )
@@ -327,6 +446,7 @@ void surfaces_unload_all( void )
     free( s_static_surface_list );
     s_static_surface_count = 0;
     s_static_surface_list = NULL;
+    grid_free();
 
     for( int i = 0; i < s_surface_object_count; ++i )
         surfaces_unload_object( i );

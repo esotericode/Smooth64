@@ -4,18 +4,19 @@ import {readFileSync} from 'node:fs';
 import {createWorld} from '../web/world.js';
 import {createCaldera} from '../web/caldera.js';
 import {createHoarfrost} from '../web/hoarfrost.js';
+import {createExpanse} from '../web/expanse.js';
 import {LevelSession,bodyCenter,formatTime} from '../web/level.js';
 import {loadCore,FixedClock} from '../web/engine.js';
 import {SURFACE,COIN_HEAL,healthWedges,respawnReason} from '../web/rules.js';
 import {DEFAULT_SETTINGS,loadSettings,saveSettings} from '../web/settings.js';
 
-const playground=createWorld(),caldera=createCaldera(),hoarfrost=createHoarfrost();
+const playground=createWorld(),caldera=createCaldera(),hoarfrost=createHoarfrost(),expanse=createExpanse();
 const bytes=readFileSync(new URL('../web/smooth64.wasm',import.meta.url));
 const actions=JSON.parse(readFileSync(new URL('../web/actions.json',import.meta.url)));
 const standAt=position=>({position:[position[0],position[1]-80,position[2]],yaw:0,velocity:[0,0,0],
   speed:0,health:0x880,action:0x0C400201,animation:197,frame:0,tick:0});
 
-for(const world of [playground,caldera,hoarfrost])test(`${world.name}: shared coins, checkpoint recovery and restart`,()=>{
+for(const world of [playground,caldera,hoarfrost,expanse])test(`${world.name}: shared coins, checkpoint recovery and restart`,()=>{
   const session=new LevelSession(world),coin=world.pickups.find(p=>p.kind==='coin');
   assert.equal(world.pickups.some(p=>p.kind==='spark'),false);
   const events=session.collect(standAt(coin.position),'ACT_IDLE');
@@ -59,7 +60,9 @@ test('every world uses the same power meter, fall detection, lava (or frostbite)
     core.heal(COIN_HEAL);for(let i=0;i<6;i++)state=core.tick({x:0,y:0,buttons:0,yaw:0});
     assert.equal(state.health,0x680);assert.equal(healthWedges(state.health),6);assert.equal(respawnReason(state),null);
     assert.ok(respawnReason({...state,health:0xff}));assert.ok(respawnReason({...state,position:[0,-1501,0]}));
-    assert.ok(respawnReason({...state,floor:-11000}));
+    assert.ok(respawnReason({...state,floor:-1.1e9}),'no floor at all');
+    assert.equal(respawnReason({...state,floor:-20000}),null,'a deep floor is still a floor');
+    assert.equal(respawnReason({...state,position:[0,-1501,0]},-5000),null,'a world can let you fall further');
   }
   assert.equal(healthWedges(0x880),8);assert.equal(healthWedges(-1),0);
   assert.ok(playground.triangles.filter(t=>t.type===SURFACE.LAVA).every(t=>t.vertices.every(v=>v[1]===-160)));

@@ -9,8 +9,10 @@
 #define LEVEL_BOUNDARY_MAX  0x2000
 #define CELL_SIZE           0x400       
 
-#define CELL_HEIGHT_LIMIT   100000.f
-#define FLOOR_LOWER_LIMIT  -110000.f
+// Smooth64: "no ceiling" and "no floor" heights, raised past any coordinate the
+// host accepts (libsm64 had 100,000 and -110,000; the original 20,000 and -11,000).
+#define CELL_HEIGHT_LIMIT   1.0e9f
+#define FLOOR_LOWER_LIMIT  -1.1e9f
 
 s32 f32_find_wall_collision(f32 *xPtr, f32 *yPtr, f32 *zPtr, f32 offsetY, f32 radius);
 s32 find_wall_collisions(struct SM64WallCollisionData *colData);

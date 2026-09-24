@@ -1,6 +1,7 @@
 import {createWorld} from './world.js';
 import {createCaldera} from './caldera.js';
 import {createHoarfrost} from './hoarfrost.js';
+import {createExpanse} from './expanse.js';
 import {animationName} from './animations.js';
 import {loadCore,FixedClock} from './engine.js';
 import {Input} from './input.js';
@@ -20,7 +21,9 @@ fetch('sounds.mp3').then(response=>response.ok?response.arrayBuffer():null).then
 // Browsers let a page start audio only after a click, tap or key press.
 for(const type of ['pointerdown','keydown','touchend'])window.addEventListener(type,()=>audio.unlock(),{capture:true,passive:true});
 let previewTimer=0;
-let core,renderer,input,previous,current,actions,worlds,sessions,world,session,mode;
+let core,renderer,input,previous,current,actions,world,session,mode;
+// Each world is built on its first visit (the Expanse alone is ~39,000 triangles).
+const MAKERS={playground:createWorld,caldera:createCaldera,hoarfrost:createHoarfrost,expanse:createExpanse},worlds={},sessions={};
 let started=false,debugPaused=false,slow=false,last=0,frames=0,frameTime=0,renderAlpha=1;
 let lastInput={x:0,y:0,buttons:0,yaw:0},toastTimer,respawning=0,meterWedges=-1;
 const modalOpen=()=>menu.open||help.open||victory.open;
@@ -52,7 +55,7 @@ function reset(index=session.checkpoint) {
   place(zone);return zone;
 }
 function buildZoneList() {
-  $('zone-list').replaceChildren();write('zones-title',world.freeTravel?'Practice destinations':'Checkpoints');
+  $('zone-list').replaceChildren();write('zones-title',world.text?.zones??(world.freeTravel?'Practice destinations':'Checkpoints'));
   world.zones.forEach((zone,index)=>{
     if(zone.section) {
       const label=document.createElement('span');label.className='zone-section';label.textContent=zone.section;$('zone-list').append(label);
@@ -66,6 +69,7 @@ function buildZoneList() {
 }
 function setMode(next) {
   cancelRespawn();clearTimeout(toastTimer);$('toast').hidden=true;
+  if(!worlds[next]){worlds[next]=MAKERS[next]();sessions[next]=new LevelSession(worlds[next]);}
   mode=next;world=worlds[next];session=sessions[next];debugPaused=false;slow=false;
   core.loadWorld(world.triangles);renderer.load(world);audio.setTheme(world.theme?.audio);
   document.body.classList.toggle('caldera',mode==='caldera');document.body.dataset.world=mode;
@@ -185,7 +189,7 @@ function tick() {
   current=core.tick(lastInput);renderer.record(current);renderer.tick(previous,current,actions[previous.action],actionName());
   audio.tick(core.sounds(),previous,current,actions[previous.action],actionName());
   session.tick(lastInput);
-  const reason=respawnReason(current);
+  const reason=respawnReason(current,world.fallLimit);
   if(reason)respawn(reason);else collectEvents(session.collect(current,actionName()));
   return !modalOpen();
 }
@@ -263,7 +267,7 @@ function drawPowerMeter(health) {
 function renderMenu() {
   const coins=session.count('coin'),shards=session.count('shard');
   write('mission-title',world.name);write('menu-time',formatTime(session.time));
-  write('objective-summary',world.freeTravel?'Practice every move, follow the coins, and try the lava crossing. All destinations are open.':world.zones[session.checkpoint].note);
+  write('objective-summary',world.text?.summary??(world.freeTravel?'Practice every move, follow the coins, and try the lava crossing. All destinations are open.':world.zones[session.checkpoint].note));
   $('objectives').hidden=world.freeTravel;
   write('menu-coins',`${coins.found} / ${coins.total} coins`);write('menu-deaths',`${session.deaths} retries`);
   renderObjectives(shards);
@@ -336,6 +340,7 @@ function frame(now) {
 $('start').addEventListener('click',()=>start('playground'));
 $('start-level').addEventListener('click',()=>start('caldera'));
 $('start-frost').addEventListener('click',()=>start('hoarfrost'));
+$('start-expanse').addEventListener('click',()=>start('expanse'));
 $('menu-button').addEventListener('click',openMenu);
 $('close-menu').addEventListener('click',()=>menu.close());
 $('resume-button').addEventListener('click',()=>{debugPaused=false;menu.close();});
@@ -365,14 +370,12 @@ for(const type of ['pointerdown','keydown','wheel'])window.addEventListener(type
 document.addEventListener('visibilitychange',()=>{audio.setHidden(document.hidden);if(document.hidden&&started&&!modalOpen())openMenu();});
 
 try {
-  worlds={playground:createWorld(),caldera:createCaldera(),hoarfrost:createHoarfrost()};
-  sessions=Object.fromEntries(Object.entries(worlds).map(([key,value])=>[key,new LevelSession(value)]));
   const [wasm,actionResponse]=await Promise.all([fetch('smooth64.wasm'),fetch('actions.json')]);
   if(!wasm.ok||!actionResponse.ok)throw new Error('Could not load the game files.');
   [core,actions]=await Promise.all([wasm.arrayBuffer().then(loadCore),actionResponse.json()]);
   renderer=new PlaygroundRenderer(canvas);input=new Input(canvas,command);input.onNavigate=navigate;setMode('caldera');
   renderer.camera.position.set(2700,4000,6200);renderer.camera.lookAt(0,1700,0);
-  $('start').disabled=false;$('start-level').disabled=false;$('start-frost').disabled=false;$('menu-button').disabled=false;
+  for(const id of ['start','start-level','start-frost','start-expanse','menu-button'])$(id).disabled=false;
   write('status','Ready when you are.');requestAnimationFrame(frame);
 } catch(error) {
   console.error(error);write('status','Unable to start');

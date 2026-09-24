@@ -113,6 +113,58 @@ The suite now passes **15 native tests and 83 Node tests**.
 - The browser check now drives a mocked standard gamepad alone. It picks Hoarfrost Heights on the welcome screen, opens the menu with Start, toggles a setting with A, raises a slider with right, opens the move guide, scrolls it with down, closes only the guide with B, opens the checkpoint list, travels, and resumes, with a visible focus ring throughout.
 - Narrow-lens renders of the distant peaks from across the level showed the depth-fighting stripes where the snow caps sat on the rock cones. After rebuilding them as a rock base and a snow cap that meet at one ring, the same renders are clean. The islands, the frozen falls from 20,000 away, and a normal view from camp were checked the same way.
 
+## The engine's arbitrary limits, lifted
+
+The goal the core protects is movement true to SM64, not frozen code, so its arbitrary limits are gone:
+- Triangle storage grows with the world; it was a fixed 4,096.
+- Coordinates may reach ±536,870,912; they were limited to ±32,767.
+- The WASM memory has no maximum of its own; it was 32 MB.
+- The "no ceiling" and "no floor" heights sit at ∓1.1 billion; they were 100,000 and −110,000.
+
+Two 32-bit overflows in the vendored collision code are fixed, in the floor and ceiling tests and in triangle normals. They were real bugs even inside the old range: a single floor 64,000 units across was missing at all 1,849 sample points, because its normal wrapped and turned it into a ceiling. The new engine finds it everywhere.
+
+- The WASM build is reproducible: rebuilding the unchanged source with the pinned wasi-sdk-25 gave the committed `web/smooth64.wasm` byte for byte.
+- Movement is unchanged: 75 runs of 900 ticks of random input with coin heals, from every checkpoint in all three worlds, gave identical state bytes in every field on every tick from the old and new builds (67,500 ticks).
+- `tests/engine.test.mjs` adds proofs:
+  - 20,000 triangles in one world;
+  - a run and jump 300,000 units out, ending within 3 units of the same run at the origin, at the same speed;
+  - single floors 64,000, 100,000 and 400,000 across, held at their corners;
+  - a jump from a floor at 150,000 with no invisible ceiling;
+  - a floor at −150,000 found;
+  - native and WASM agreeing tick for tick far from the origin;
+  - out-of-range geometry refused.
+- `tools/check_vendor.py` still checks 105 vendored files against upstream byte for byte, and each of the 3 patched files against its recorded hash and reason.
+
+The suite passes **15 native tests and 84 Node tests**.
+
+## Version 0.8.0: the collision grid and The Expanse
+
+libsm64 checked every loaded triangle on every floor, ceiling and wall query, several times a tick, so a tick's cost grew with the world: about 3.6 ms in the Expanse's 39,000 triangles. The core now keeps the static triangles in a grid, as the original game did. Each cell lists, in load order, every triangle a query in it could match, so results are the same as the full scan's:
+
+- Old (full scan) and new (grid) builds gave identical state bytes in every field, identical sound lists, on every tick of:
+  - 100 runs of 900 ticks in the three existing worlds, from every checkpoint: two runs each of a fresh stick every tick, and two of held headings with jumps, dives and crouches (90,000 ticks);
+  - 32 such runs in the Expanse, from all eight travel points (28,800 ticks);
+  - 72 runs of 700 ticks among random clutter: 12 worlds of 600 walls, floors and ceilings from 10 to 4,500 units across, up to 200,000 units wide and placed as far as 300 million units out (50,400 ticks).
+- 140,000 floor queries at random points in those worlds gave identical heights.
+- Tick cost: 112 µs to 7.8 µs on average across the three existing worlds; 3,633 µs to 12.5 µs in the Expanse; 3,670 µs to 3.6 µs in a 40,000-triangle test world (a 2-triangle world takes 3.4 µs). The Node suite went from about 49 s to about 4 s.
+- The WASM build stays reproducible: two rebuilds gave the same bytes.
+- `tests/engine.test.mjs` checks that 40,000 triangles take less than ten times as long as 2 (a full scan took about 860 times as long), and that walls at every offset from the grid's cell edges each stop a run exactly 50 units short. A grid built without the wall reach fails that test at the third wall.
+- `tools/check_vendor.py` checks 104 vendored files against upstream byte for byte, and each of the 4 patched files against its recorded hash and reason.
+
+`tests/expanse.test.mjs` proves the Expanse works:
+
+- Its geometry is valid: integer vertices, no degenerate triangles, shapes covering every triangle, and 38,848 triangles, over eight times the old 4,096 cap, spanning 240,000 units. It has 156 coins and 8 travel points, each coin 85 units above the ground or crate under it and counted toward a travel point's row.
+- Every travel point spawns onto its own flat pad, exactly, including the Far Corner about 153,000 units from the middle.
+- At 20,000 random points the core's floor is the drawn ground (0.007 units apart at worst) or a block's top, and past the rims it is the void.
+- 246 runs at the 24 blocks nearest the middle and all eight towers, from up to eight directions each (where the run-up is clear), all stop at the block and never pass inside it.
+- A run and a jump at the Far Corner match the same move at the Crossroads tick for tick: the same actions and speeds, with positions within half a unit.
+- A jump off the east rim leaves the ground, falls past the fall limit (tick 79), and returns to a beacon.
+- Native and WASM builds agree byte for byte for 150 ticks at the Far Corner.
+
+The shared gameplay tests include the Expanse. The browser check visits it through the menu, checks its HUD totals (156 coins, no shards), travels to the Far Corner and runs there, reads its travel point list and summary, and confirms the other worlds keep their progress. Screenshots from the middle, the Crate Yard, the summit, the rims and the Far Corner were reviewed.
+
+The suite passes **15 native tests and 93 Node tests**.
+
 ## Practical limits
 
 The polish pass was exercised in headless Chromium with software WebGL, including desktop (1280 × 800), touch (390 × 844), and the offline single-file build. The browser regression check passes with no JavaScript or WebGL errors, including storage-unavailable fallback and zero network asset requests in the offline build. Desktop and touch screenshots were inspected. This is automated interaction and visual verification, not a human play session. Gamepad edges are tested with mocked standard-gamepad input; physical gamepad behavior, Firefox/Safari, and performance on target devices still need hands-on verification.

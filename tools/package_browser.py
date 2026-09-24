@@ -63,7 +63,8 @@ def package():
 
 1. Extract this ZIP (right-click it, then Extract All on Windows).
 2. Double-click Smooth64-Play.html.
-3. Click Play Cinder Caldera, Play Hoarfrost Heights, or Visit the playground.
+3. Click Play Cinder Caldera, Play Hoarfrost Heights, Visit the playground,
+   or Roam the Expanse.
 
 If asked which app to use, choose Microsoft Edge, Chrome, or Firefox.
 No installation, account, internet connection, Python, terminal, or ROM needed.

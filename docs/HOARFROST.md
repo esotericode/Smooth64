@@ -16,7 +16,7 @@ A high valley floats on a sea of cloud under the **Hoarfrost Horn**. You start a
 |---|---|---|
 | Footprint | 12,800 × 12,800 | 23,000 × 34,800 (with the Horn's massing) |
 | Height climbed | 3,200 | 10,100 (summit snowfield; the Horn's Tip stands at 11,200) |
-| Collision triangles | 1,260 | 2,698 (budget `BUDGET` 3,000; the core holds 4,096) |
+| Collision triangles | 1,260 | 2,698 (the core has no triangle limit) |
 | Stars | 2 | 3: Icefall Star, Aurora Star (the goal: the clock stops here), Polar Star (bonus) |
 | Shards | 8 | 8 Frost Shards |
 | Coins | 52 | 100 |
@@ -98,7 +98,7 @@ These numbers come from driving the unchanged core. Design gaps and slopes aroun
 - **Colour tells the player what a surface does:** white snow is safe, blue is ice (you slide), bright white is deep snow, grey rock grips, and the gale's paths are a shade greyer than snow. Keep that language.
 - **Checkpoints must stand on flat floors** (the spawn test compares heights exactly).
 - **Coins belong to the checkpoint whose stretch they sit on** (`section` = the checkpoint's name): the menu counts coins per checkpoint. Coins over a gap (tracing a jump) need `{arc:true}` and a test that a real jump collects them.
-- **Budget:** the level is capped by `BUDGET` (3,000) in `web/hoarfrost.js`. The core holds 4,096 triangles; collision is a linear scan, so ~4,000 is fine at 30 Hz, but test searches get slower with every triangle.
+- **Triangle count:** there is no cap, and collision cost does not grow with it: the core keeps static triangles in a grid, so a check only visits the triangles near it (about 8 µs a tick here).
 - **Walls and slabs get a snow `lip`** (a band of the top colour on each wall) so terraces read as snow over rock or ice.
 - **The camera sees up to 44,000** (`theme.far`), and fog runs 8,000–38,000. The sky dome, aurora and stars follow the camera.
 - **Far away, the depth buffer is coarse** (about 4 units at 25,000 with the near plane at 10), so dressing must never lay one surface just over another there: the distant peaks are a rock base and a snow cap meeting at one ring, not a cap sitting on a cone. Overlays that hug a face (the falls' glint, windows, painted titles) use `polygonOffset`.
@@ -109,7 +109,6 @@ Learned on the upper Horn:
 - **Put structures on crests and terraces, not against slopes.** The west ridge's steps, cornice, ledge and towers all sit astride the crest (`astride`), buried below it.
 - **Faces a few degrees short of vertical are still floors, not walls.** An 86° face on the Horn let falls leak through where a wall would have stopped them; make cliffs exactly vertical instead.
 - **Watch for closed hollows between mountains.** A lesser peak west of the Horn made a pocket where a fall could slide forever; it was removed.
-- **Keep lab floors modest.** The core's point-in-triangle test uses 32-bit products, so a triangle much bigger than the catch floor (32,000 × 40,000) can overflow and vanish.
 - **Run the trap scan after every change**: drop the explorer on a grid over the area and check that every fall settles somewhere, grabs a ledge, or drops into the clouds.
 
 ## Changing the level

@@ -12,8 +12,11 @@ export const PICKUPS=Object.freeze({
   coin:{reach:95,heal:COIN_HEAL},shard:{reach:115},star:{reach:150},bonus:{reach:150},
 });
 export const healthWedges=health=>Math.max(0,Math.min(HEALTH.WEDGES,Math.floor(health/256)));
-export function respawnReason(state) {
+// The core reports a floor this low (FLOOR_LOWER_LIMIT) when there is none at all.
+export const NO_FLOOR=-1e9;
+// A world may set how far you can fall before returning to a beacon (`fallLimit`).
+export function respawnReason(state,fallLimit=-1500) {
   if(state.health<HEALTH.ALIVE)return 'Out of power';
-  if(state.position[1]<-1500||state.floor<-10000)return 'Back to the checkpoint';
+  if(state.position[1]<fallLimit||state.floor<=NO_FLOOR)return 'Back to the checkpoint';
   return null;
 }

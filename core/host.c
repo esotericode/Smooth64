@@ -1,5 +1,6 @@
 #include "smooth64.h"
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 #include "decomp/shim.h"
 #include "decomp/include/PR/os_cont.h"
@@ -18,8 +19,9 @@ static struct GlobalState world;
 static struct Object character;
 static struct Area area;
 static struct Camera camera;
-static struct SM64Surface triangles[4096];
-static unsigned triangle_count;
+/* Grows as needed: a world holds as many triangles as memory allows. */
+static struct SM64Surface *triangles;
+static unsigned triangle_count, triangle_capacity;
 static int ready;
 static S64State snapshot;
 
@@ -53,12 +55,18 @@ void s64_clear_surfaces(void) { ready = 0; triangle_count = 0; }
 int s64_add_triangle(int type, int ax,int ay,int az,
                     int bx,int by,int bz, int cx,int cy,int cz) {
     const int v[3][3] = {{ax,ay,az},{bx,by,bz},{cx,cy,cz}};
-    if (triangle_count >= 4096 || type < 0 || type > 32767) return -1;
+    if (type < 0 || type > 32767) return -1;
     for (int i=0;i<3;i++) for(int j=0;j<3;j++)
-        if (v[i][j] < -32768 || v[i][j] > 32767) return -1;
+        if (v[i][j] < -S64_COORDINATE_LIMIT || v[i][j] > S64_COORDINATE_LIMIT) return -1;
     /* Reject degenerates before they reach the upstream surface loader. */
     double ux=bx-ax, uy=by-ay, uz=bz-az, vx=cx-ax, vy=cy-ay, vz=cz-az;
     if (ux*vy-uy*vx == 0 && uy*vz-uz*vy == 0 && uz*vx-ux*vz == 0) return -1;
+    if (triangle_count == triangle_capacity) {
+        unsigned capacity = triangle_capacity ? triangle_capacity * 2 : 4096;
+        struct SM64Surface *grown = realloc(triangles, sizeof(*triangles) * capacity);
+        if (!grown) return -1;
+        triangles = grown; triangle_capacity = capacity;
+    }
     struct SM64Surface *s = &triangles[triangle_count++];
     memset(s, 0, sizeof(*s));
     s->type = (int16_t)type;
@@ -74,8 +82,8 @@ int s64_commit_surfaces(void) {
 int s64_reset(float x, float y, float z, int face_yaw) {
     ready = 0;
     s64_sound_log_count = 0;
-    if (!isfinite(x) || !isfinite(y) || !isfinite(z) ||
-        fabsf(x)>32767 || fabsf(y)>32767 || fabsf(z)>32767) return -1;
+    if (!isfinite(x) || !isfinite(y) || !isfinite(z) || fabsf(x)>S64_COORDINATE_LIMIT ||
+        fabsf(y)>S64_COORDINATE_LIMIT || fabsf(z)>S64_COORDINATE_LIMIT) return -1;
     memset(&world, 0, sizeof(world));
     memset(&character, 0, sizeof(character));
     memset(&area, 0, sizeof(area));

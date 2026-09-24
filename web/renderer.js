@@ -5,9 +5,11 @@ import {decoratePlayground} from './decor.js';
 import {decorateCaldera} from './caldera-scene.js';
 import {decorateHoarfrost} from './hoarfrost-scene.js';
 
-// Render-only dressing per world kind; the playground's has no updates.
-const DRESSING={caldera:decorateCaldera,hoarfrost:decorateHoarfrost};
-// Material response per shape style. Everything is vertex-coloured.
+// Render-only dressing per world kind; the playground's has no updates and
+// the Expanse has none.
+const DRESSING={playground:decoratePlayground,caldera:decorateCaldera,hoarfrost:decorateHoarfrost};
+// Material response per shape style. Everything is vertex-coloured. A style
+// may name a chunk after a colon ('rock:3:4'): its own mesh, the same look.
 const SURFACES={metal:{roughness:.45,metalness:.35},ice:{roughness:.24,metalness:.08},snow:{roughness:.97},
   rock:{roughness:.93},wood:{roughness:.86},pine:{roughness:.9},cloth:{roughness:.8}};
 
@@ -107,8 +109,9 @@ export class PlaygroundRenderer {
     this.level=new T.Group();this.scene.add(this.level);
     this.scene.background=new T.Color(theme.background);
     this.scene.fog=new T.Fog(...theme.fog);
-    // A big world may see further; the default suits the smaller ones.
-    this.camera.far=theme.far??30000;this.camera.updateProjectionMatrix();
+    // A big world may see further (and push the near plane out to keep depth
+    // precision); the defaults suit the smaller ones.
+    this.camera.near=theme.near??10;this.camera.far=theme.far??30000;this.camera.updateProjectionMatrix();
     this.renderer.toneMappingExposure=theme.exposure;
     this.hemisphere.color.set(theme.hemisphere[0]);this.hemisphere.groundColor.set(theme.hemisphere[1]);this.hemisphere.intensity=theme.hemisphere[2];
     this.sun.color.set(theme.sun[0]);this.sun.intensity=theme.sun[1];
@@ -117,9 +120,10 @@ export class PlaygroundRenderer {
     // Optional lava bounce light, baked into vertex colors near the lake.
     const glow=theme.underglow&&new T.Color(theme.underglow.color),lit=new T.Color();
     for(const shape of world.shapes) {
+      const style=shape.style?.split(':')[0];
       // A hidden shape (e.g. a catch floor far below the clouds) still collides
       // and still shows in the collision wireframe; it just is not drawn.
-      if(shape.style==='hidden') {
+      if(style==='hidden') {
         const hidden=new T.BufferGeometry().setAttribute('position',new T.Float32BufferAttribute(
           world.triangles.slice(shape.start,shape.end).flatMap(t=>t.vertices.flat()),3));
         this.wire.add(new T.LineSegments(new T.WireframeGeometry(hidden),new T.LineBasicMaterial({color:'#174f49',depthTest:false,transparent:true,opacity:.55})));
@@ -130,7 +134,7 @@ export class PlaygroundRenderer {
         const color=new T.Color(triangle.color);
         for(const v of triangle.vertices) {
           positions.push(...v);lit.copy(color);
-          if(glow&&shape.style!=='lava')lit.lerp(glow,theme.underglow.strength*Math.exp(-Math.max(0,v[1])/theme.underglow.height));
+          if(glow&&style!=='lava')lit.lerp(glow,theme.underglow.strength*Math.exp(-Math.max(0,v[1])/theme.underglow.height));
           colors.push(lit.r,lit.g,lit.b);
         }
       }
@@ -139,12 +143,12 @@ export class PlaygroundRenderer {
       geometry.setAttribute('color',new T.Float32BufferAttribute(colors,3));
       geometry.computeVertexNormals();
       let material;
-      const hazard=HAZARD_SHADERS[shape.style];
+      const hazard=HAZARD_SHADERS[style];
       if(hazard) {
         material=new T.ShaderMaterial({vertexShader:LAVA_VERTEX,fragmentShader:hazard,fog:true,
           uniforms:T.UniformsUtils.merge([T.UniformsLib.fog,{time:{value:0}}])});
         this.lava.push(material);
-      } else material=new T.MeshStandardMaterial({vertexColors:true,roughness:.9,metalness:0,...SURFACES[shape.style]});
+      } else material=new T.MeshStandardMaterial({vertexColors:true,roughness:.9,metalness:0,...SURFACES[style]});
       const mesh=new T.Mesh(geometry,material);
       mesh.castShadow=!hazard;mesh.receiveShadow=!hazard;
       this.level.add(mesh);this.meshes.push(mesh);
@@ -154,7 +158,7 @@ export class PlaygroundRenderer {
       }
       this.wire.add(new T.LineSegments(new T.WireframeGeometry(geometry),new T.LineBasicMaterial({color:'#174f49',depthTest:false,transparent:true,opacity:.55})));
     }
-    this.dressing=DRESSING[world.kind]?.(this.level,world,this)??(decoratePlayground(this.level,world),null);
+    this.dressing=DRESSING[world.kind]?.(this.level,world,this)??null;
     this.pickups=world.pickups.map((pickup,i)=>this.pickup(pickup,i));
   }
   pickup(pickup,index) {

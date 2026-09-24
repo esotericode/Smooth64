@@ -26,8 +26,13 @@ typedef struct S64State {
 } S64State;
 
 /* Triangles use original integer coordinates and CCW winding viewed from
- * their collidable side. Returns -1 on capacity/invalid coordinate error.
+ * their collidable side. There is no triangle limit beyond memory. Coordinates
+ * may reach +-S64_COORDINATE_LIMIT, which keeps the collision tests' 64-bit
+ * integer products exact; movement stays true to the original far inside that
+ * (float positions lose precision: about 1/32 unit at 250,000). Returns
+ * -1 for an out-of-range, degenerate or unstorable triangle.
  * Clear, add, commit, THEN reset; committing invalidates old floor pointers. */
+enum { S64_COORDINATE_LIMIT = 1 << 29 };
 S64_API void s64_clear_surfaces(void);
 S64_API int s64_add_triangle(int type,
     int ax,int ay,int az, int bx,int by,int bz, int cx,int cy,int cz);

@@ -100,6 +100,15 @@ try {
   await page.locator('#menu').evaluate(el=>el.scrollTop=0);await page.screenshot({path:path.join(out,'hoarfrost-menu.png')});
   await page.locator('#resume-button').click();await page.screenshot({path:path.join(out,'hoarfrost.png')});
   await world(page,'caldera');assert.equal(await count(page),savedCoins,'visiting the ice level leaves the adventure intact');
+  // The Expanse: built on its first visit, with travel points out to its far corner.
+  await world(page,'expanse');assert.equal(await page.locator('#coin-total').textContent(),'/156');
+  assert.equal(await page.locator('#shards-hud').isVisible(),false);assert.match(await page.locator('#checkpoint-name').textContent(),/Crossroads/);
+  await destination(page,7);assert.match(await page.locator('#checkpoint-name').textContent(),/Far Corner/);
+  await page.keyboard.down('w');await page.waitForTimeout(1500);await page.keyboard.up('w');
+  await openMenu(page);assert.equal(await page.locator('#zones-title').textContent(),'Travel points');
+  assert.match(await page.locator('#objective-summary').textContent(),/big open world/);
+  await page.locator('#resume-button').click();await page.screenshot({path:path.join(out,'expanse.png')});
+  await world(page,'caldera');assert.equal(await count(page),savedCoins,'visiting the Expanse leaves the adventure intact');
   await openMenu(page);await page.locator('#setting-developer').check();
   await page.locator('#setting-volume').fill('35');await page.locator('#setting-deadzone').fill('22');
   assert.equal(await page.locator('#volume-value').textContent(),'35%');
@@ -114,7 +123,7 @@ try {
   assert.equal(await page.locator('#setting-music').inputValue(),'0');await page.locator('#setting-music').fill('50');
   await page.locator('#setting-developer').uncheck();await page.locator('#resume-button').click();
   await page.screenshot({path:path.join(out,'playground.png')});
-  console.log('PASS world switching (three worlds), preserved pickups/checkpoints, independent restart and saved settings, volumes and dead zone');
+  console.log('PASS world switching (four worlds), preserved pickups/checkpoints, independent restart and saved settings, volumes and dead zone');
   await page.context().browser().close();
 
   const touch=await pageFor({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:1});

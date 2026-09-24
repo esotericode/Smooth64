@@ -17,7 +17,8 @@ const root=fileURLToPath(new URL('..',import.meta.url)),web=path.join(root,'web'
 const [kind='hoarfrost',json='[]']=process.argv.slice(2),views=JSON.parse(json);
 assert.ok(views.length,'Pass at least one view: [[name,[camera],[look]]]');
 mkdirSync(out,{recursive:true});
-const makers={hoarfrost:['hoarfrost.js','createHoarfrost'],caldera:['caldera.js','createCaldera'],playground:['world.js','createWorld']};
+const makers={hoarfrost:['hoarfrost.js','createHoarfrost'],caldera:['caldera.js','createCaldera'],playground:['world.js','createWorld'],
+  expanse:['expanse.js','createExpanse']};
 const [file,maker]=makers[kind];
 const viewer=`<!doctype html><html><head><style>html,body{margin:0;overflow:hidden}canvas{display:block;width:100vw;height:100vh}</style></head>
 <body><canvas id="c"></canvas><script type="module">
