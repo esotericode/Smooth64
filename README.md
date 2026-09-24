@@ -7,27 +7,33 @@
 
 1. Download and extract the ZIP.
 2. Double-click **Smooth64-Play.html**.
-3. Click **Cinder Caldera** for the level, or **Movement playground** for the test areas.
+3. Click **Cinder Caldera** or **Hoarfrost Heights** to play a level, or **Movement playground** for the test areas.
 
 Works offline in Edge, Chrome, or Firefox. No installation, Python, terminal, compiler, or ROM required. **WASD** moves, **Space** jumps, **Shift** crouches, **J** attacks. Sound and music start after your first click or key press.
 
 The original recovery ZIP is kept in this repository. The folders below contain the editable project source.
 
 
-A ROM-free platformer built around the Super Mario 64 US movement code, with an original explorer, a volcanic adventure, an ice climb (part one), and a connected practice playground.
+A ROM-free platformer built around the Super Mario 64 US movement code, with an original explorer, a volcanic adventure, a mountain of ice to climb, and a connected practice playground.
 
-## In progress: Hoarfrost Heights, part one
+## Version 0.7.0 — Hoarfrost Heights
 
-A new level is in the source, not yet in a release. It is much bigger than Cinder Caldera: about five times the footprint and three times the height once the summit is added. A high valley floats on a sea of cloud under the **Hoarfrost Horn**. Part one takes you from Frostmere Camp to the **Icefall Star** on the Horn's Shoulder:
+A second full level, much bigger than Cinder Caldera: about five times the footprint and three times the height. A high valley floats on a sea of cloud under the **Hoarfrost Horn**. You climb from Frostmere Camp to the summit, then ride the Avalanche Run home:
 
 1. **Mirror Lake:** hop across floes over frostbite water. The water bites like lava, as in the original's snowy course. A tilted ice floe slides you straight into a jump, and an ice runway you cannot stop on ends in a long jump.
 2. **Pinewood Drifts:** terraces of deep snow that slow your run, and a jump and grab out of each. A fallen, iced-over pine spans a ravine, snapped in two.
 3. **The Glacier:** crevasses, a snow bridge, and an ice chute. You slide at over 90 units a tick and must jump before the lip to clear the Great Crevasse.
-4. **The Icefall:** a serac step, a 950-unit wall-kick chimney, then a grippy rock rib beside an ice chute that cannot be climbed.
+4. **The Icefall:** a serac step, a 950-unit wall-kick chimney, then a grippy rock rib beside an ice chute that cannot be climbed, up to the **Icefall Star** on the Shoulder, halfway up the Horn.
+5. **The Frozen Falls:** ledges along the Horn's sheer face, wall kicks between a frozen waterfall and a serac, and a hang from the icicles across the curtain.
+6. **Gale Ridge:** paths cut into the face, in a wind that always blows south. Stand still and it blows you off, so keep moving and jump each gap from its very edge.
+7. **The Cornice and the Summit:** rock steps up the west ridge, a hang under a snow cornice above the slick crest, a wall-kick chimney between two towers, and the **Aurora Star** on the summit cairn, where the clock stops.
+8. **The Avalanche Run:** the way home, an ice luge from the summit round the Horn and over the lake into camp. Jump from the slide at each of its two lips.
 
-Blue ice will not hold you: you slide down any slope of it, a full run skids ~1,200 units, and landing a jump and letting go of the stick is how you stop dead. Deep snow caps your run; grey rock grips even at 45°. **Five Frost Shards** hide behind optional challenges: the watchtower, the Lone Floe, the Great Pine, a crevasse ledge, and a serac needle. Six beacons are checkpoints. Twilight, snowfall and an aurora overhead are drawn in real time.
+Blue ice will not hold you: you slide down any slope of it, a full run skids ~1,200 units, and landing a jump and letting go of the stick is how you stop dead. Deep snow caps your run; grey rock grips even at 45°. **Eight Frost Shards** hide behind optional challenges: the watchtower, the Lone Floe, the Great Pine, a crevasse ledge, a serac needle, an ice pillar under the icicles, the Weathervane across a windy gulf, and the Horn's Tip. Find all eight and the **Polar Star** shines on the Mirror Isle. Nine beacons are checkpoints, and 100 coins line the way. Footsteps crunch on snow and ring on ice, the wind gusts on Gale Ridge, and frostbite water splashes instead of sizzling. Twilight, snowfall and an aurora overhead are drawn in real time.
 
-Part two, the upper Horn, is planned and not built: the Frozen Falls, a wind-scoured ridge, the summit's Aurora Star, a long slide home, three more shards, and the bonus Polar Star. [Design notes and the part two plan](docs/HOARFROST.md). Every leg of part one and every shard is proven reachable in `tests/hoarfrost.test.mjs` by driving the real core with controller inputs. Negative checks show where a specific move is required, and that the upper Horn stays sealed for now.
+Every leg of the route, every shard and the Polar Star are proven reachable in `tests/hoarfrost.test.mjs` by driving the real core with controller inputs. Negative checks show where a specific move is required.
+
+[Design notes](docs/HOARFROST.md) · [Hoarfrost Heights release notes](docs/releases/v0.7.0.md)
 
 ## Version 0.6.0 — original music
 
