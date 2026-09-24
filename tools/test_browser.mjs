@@ -92,10 +92,10 @@ try {
   assert.match(await page.locator('#checkpoint-name').textContent(),/runway/);
   await world(page,'caldera');assert.equal(await count(page),savedCoins,'restarting practice leaves the adventure intact');
   // Hoarfrost Heights: its own HUD totals and objectives, and progress kept like the others.
-  await world(page,'hoarfrost');assert.equal(await page.locator('#shard-max').textContent(),'/5');
+  await world(page,'hoarfrost');assert.equal(await page.locator('#shard-max').textContent(),'/8');
   assert.match(await page.locator('#checkpoint-name').textContent(),/Frostmere Camp/);
   await page.keyboard.down('w');await page.waitForTimeout(1200);await page.keyboard.up('w');
-  await openMenu(page);assert.match(await page.locator('#objectives').textContent(),/Icefall Star.*Frost Shards.*snowed in/);
+  await openMenu(page);assert.match(await page.locator('#objectives').textContent(),/Icefall Star.*Aurora Star.*Frost Shards.*Polar Star/);
   await page.locator('#menu').evaluate(el=>el.scrollTop=0);await page.screenshot({path:path.join(out,'hoarfrost-menu.png')});
   await page.locator('#resume-button').click();await page.screenshot({path:path.join(out,'hoarfrost.png')});
   await world(page,'caldera');assert.equal(await count(page),savedCoins,'visiting the ice level leaves the adventure intact');

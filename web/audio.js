@@ -36,6 +36,8 @@ const CUES={
   oof:[[['bwip'],-23,[.62,.7],{reverse:true}]],
   hurt:[[['hurt'],-20,[.95,1.05]]],
   scorch:[[['scorch'],-22,[1,1]],[['poof1'],-24,[.6,.66]]],
+  // Frostbite water: a generated splash under a low puff.
+  splash:[[['splash'],-19,[.92,1.08]],[['poof1','poof2'],-25,[.55,.62]]],
   falling:[[['fall'],-20,[1,1]]],
   // Gameplay cues from main.js.
   coin:[[['coin'],-19,[1,1]]],
@@ -61,11 +63,17 @@ const VOICE={0x00:'hup',0x01:'hup',0x02:'hup',0x03:'hoohoo',0x04:'yahoo',0x05:'o
   0x20:'oof',0x22:'drop',0x24:'swing',0x2B:'yahoo',0x2C:'yahoo',0x2D:'yahoo',0x2E:'yahoo',0x2F:'yahoo',0x30:'oof'};
 // Grass/snow/sand floors muffle a step; stone and ice brighten it. [rate, dB]
 const FLOOR=[[1,0],[.9,-3],[1,0],[1.08,1],[.95,0],[.85,-4],[1.12,0],[.88,-3]];
+// A world may re-voice its hazard floor: frostbite water splashes and fizzes.
+const HAZARDS={frost:{scorch:'splash',burn:'fizz'}};
+// Continuous beds: [filter type, cutoff Hz, gain at full level].
+const BEDS={slide:['lowpass',1600,.26],burn:['highpass',1400,.5],wind:['lowpass',650,.34],fizz:['highpass',2600,.42]};
 
 export function soundCue(bits) {
   const bank=bits>>>28,id=bits>>>16&255;
   if(bank===1)return id<8?{bed:'slide',terrain:id}:id===0x10?{bed:'burn'}:null;
   if(bank===2)return VOICE[id]?{cue:VOICE[id]}:null;
+  // SOUND_ENV_WIND2: requested on every tick spent over a wind floor.
+  if(bank===4)return id===0x10?{bed:'wind'}:null;
   if(bank!==0)return null;
   const terrain=TERRAIN.find(([base])=>id>=base&&id<base+8);
   return terrain?{cue:terrain[1],terrain:id-terrain[0]}:ACTION[id]?{cue:ACTION[id]}:null;
@@ -102,8 +110,11 @@ export class GameAudio {
   constructor({volume=.8,music=.5,createContext=browserContext,createMusic=newMusic,random=Math.random}={}) {
     this.volume=volume;this.musicVolume=music;this.createContext=createContext;this.createMusic=createMusic;this.random=random;
     this.ctx=null;this.bytes=null;this.samples=null;this.reversed={};this.beds={};this.voices=0;this.last={};
-    this.music=null;this.wantMusic=false;this.hidden=false;this.timer=null;
+    this.music=null;this.wantMusic=false;this.hidden=false;this.timer=null;this.terrain=null;this.hazard=null;
   }
+  // Presentation per world: `terrain` re-maps the core's terrain sounds (the
+  // host always reports its default terrain), `hazard` re-voices the hazard floor.
+  setTheme({terrain=null,hazard=null}={}) {this.terrain=terrain;this.hazard=hazard;this.hush();}
   // The sprite's bytes arrive with the other game files; decoding waits for a
   // user gesture, since browsers only let pages start audio after one.
   load(bytes) {this.bytes=bytes;if(this.ctx)this.decode();}
@@ -149,7 +160,8 @@ export class GameAudio {
   }
   makeBeds() {
     // Continuous textures, generated rather than looped from a recording so
-    // they never repeat audibly: a shoe/body scrape and a lava crackle.
+    // they never repeat audibly: a shoe/body scrape, a lava crackle, a gusting
+    // wind and the fizz of frostbite water.
     this.noise={
       slide:noise(this.ctx,1.6,(data,random)=>{
         let low=0,high=0,previous=0;
@@ -163,7 +175,24 @@ export class GameAudio {
           crackle*=decay;data[i]=(white-previous)*.08+crackle;previous=white;
         }
       }),
+      // Deep, rolling noise: white noise, twice smoothed.
+      wind:noise(this.ctx,3,(data,random)=>{
+        let a=0,c=0;for(let i=0;i<data.length;i++){a+=(random()-a)*.05;c+=(a-c)*.1;data[i]=c*6;}
+      }),
+      // A thin hiss with sparse, bright ice ticks.
+      fizz:noise(this.ctx,2,(data,random,rate)=>{
+        const decay=Math.exp(-1/(rate*.0012));let tick=0,previous=0;
+        for(let i=0;i<data.length;i++) {
+          const white=random();if(random()>1-25/rate)tick=random()*.7;
+          tick*=decay;data[i]=(white-previous)*.12+tick*(random()>0?1:-1);previous=white;
+        }
+      }),
     };
+    // A splash for frostbite water: a burst of noise that closes as it fades.
+    const splash=noise(this.ctx,.4,(data,random,rate)=>{
+      let low=0;for(let i=0;i<data.length;i++){const t=i/rate,open=.08+.9*Math.exp(-t*14);low+=(random()-low)*open;data[i]=low*Math.exp(-t*9)*(1-Math.exp(-t*400));}
+    });
+    this.samples.splash={buffer:splash,level:-20};
   }
   get ready() {return !!this.samples&&this.ctx?.state==='running'&&this.volume>0;}
   setVolume(value) {
@@ -208,18 +237,21 @@ export class GameAudio {
   // Keep a continuous sound going; it fades once a tick stops requesting it.
   sustain(kind,level,brightness=1) {
     if(!this.ready||!this.noise)return;
-    const ctx=this.ctx,now=ctx.currentTime;let bed=this.beds[kind];
+    const ctx=this.ctx,now=ctx.currentTime,[type,cutoff,gain]=BEDS[kind];let bed=this.beds[kind];
     if(!bed) {
       const source=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),amp=ctx.createGain();
       source.buffer=this.noise[kind];source.loop=true;
-      filter.type=kind==='burn'?'highpass':'lowpass';filter.frequency.value=kind==='burn'?1400:1600;
+      filter.type=type;filter.frequency.value=cutoff;
       amp.gain.value=0;source.connect(filter).connect(amp).connect(this.bus);
       source.start(now,this.random()*source.buffer.duration);
       bed=this.beds[kind]={source,filter,amp};
     }
     bed.held=true;
-    bed.amp.gain.setTargetAtTime((kind==='burn'?.5:.26)*level,now,.03);
+    // The wind gusts: two slow waves beating against each other.
+    const gust=kind==='wind'?.55+.45*Math.sin(now*1.3)*Math.sin(now*.47+1):1;
+    bed.amp.gain.setTargetAtTime(gain*level*gust,now,kind==='wind'?.25:.03);
     if(kind==='slide')bed.filter.frequency.setTargetAtTime(700+2600*brightness,now,.05);
+    if(kind==='wind')bed.filter.frequency.setTargetAtTime(380+520*gust,now,.3);
   }
   release(kind) {
     const bed=this.beds[kind];if(!bed)return;
@@ -265,19 +297,20 @@ export class GameAudio {
   // One simulation tick: the core's requests plus a few transitions.
   tick(sounds,previous,current,previousName,name) {
     if(!this.ready){this.hush();return;}
-    const played=new Set();
+    const played=new Set(),swap=HAZARDS[this.hazard]??{};
     for(const bits of sounds) {
       const sound=soundCue(bits);if(!sound)continue;
-      const [rate,db]=FLOOR[sound.terrain??0]||FLOOR[0];
+      const [rate,db]=FLOOR[this.terrain?.[sound.terrain]??sound.terrain??0]||FLOOR[0];
       if(sound.bed) {
-        const speed=Math.min(1,Math.abs(current.speed)/48);
-        this.sustain(sound.bed,sound.bed==='burn'?1:Math.max(.2,speed)*10**(db/20),speed);continue;
+        const bed=swap[sound.bed]??sound.bed,speed=Math.min(1,Math.abs(current.speed)/48);
+        this.sustain(bed,bed==='slide'?Math.max(.2,speed)*10**(db/20):1,speed);continue;
       }
-      if(played.has(sound.cue))continue;played.add(sound.cue);
+      const cue=swap[sound.cue]??sound.cue;
+      if(played.has(cue))continue;played.add(cue);
       let gain=10**(db/20);
-      if(sound.cue==='step')gain*=.55+.45*Math.min(1,Math.abs(current.speed)/32);
-      if(sound.cue==='land'||sound.cue==='body')gain*=.7+.3*Math.min(1,Math.max(0,(-previous.velocity[1]-10)/50));
-      this.cue(sound.cue,{gain,rate});
+      if(cue==='step')gain*=.55+.45*Math.min(1,Math.abs(current.speed)/32);
+      if(cue==='land'||cue==='body')gain*=.7+.3*Math.min(1,Math.max(0,(-previous.velocity[1]-10)/50));
+      this.cue(cue,{gain,rate});
     }
     for(const cue of transitionCues(previousName,name))this.cue(cue);
     for(const [kind,bed] of Object.entries(this.beds))if(bed.held)bed.held=false;else this.release(kind);

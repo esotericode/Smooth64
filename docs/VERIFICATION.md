@@ -79,25 +79,30 @@ In Chromium, the browser check confirms that the music starts only when play beg
 
 Commands are in the README. The cross-compiler test runs the same inputs through the actual native shared library and committed WASM, not a JavaScript rewrite of physics.
 
-## Hoarfrost Heights, part one
+## Hoarfrost Heights
 
-The suite now passes **15 native tests and 74 Node tests**. `tests/hoarfrost.test.mjs` drives the unchanged core through the new level with controller plans from `tests/routes.mjs`:
+The suite now passes **15 native tests and 80 Node tests**. `tests/hoarfrost.test.mjs` drives the unchanged core through the whole level with controller plans from `tests/routes.mjs`:
 
-- Geometry: 1,910 triangles, within part one's 2,200 budget (the core holds 4,096). Integer coordinates, no degenerate triangles, frostbite water only ever a floor at y = 0, a catch floor under every gap, every pickup over solid ground except the two coins that trace the chute jump, and unique ids.
+- Geometry: 2,698 triangles, within the level's 3,000 budget (the core holds 4,096). Integer coordinates, no degenerate triangles, frostbite water only ever a floor at y = 0, a catch floor under every gap, every pickup over solid ground except the five coins that trace a move over a gap (each tested with that move), unique ids, and exactly 8 shards, 2 stars, 1 bonus star, 9 checkpoints and 100 coins.
 - Every checkpoint settles on its own floor.
-- Surfaces as the level assumes: frostbite water costs three wedges and launches you; ice keeps skidding after you let go mid-run, but a landing stops you dead; the grippy rock rib climbs where its icy twin cannot; deep snow caps a run at ~24.
-- Main route, all four parts:
+- Surfaces as the level assumes: frostbite water costs three wedges and launches you; ice keeps skidding after you let go mid-run, but a landing stops you dead; the grippy rock rib climbs where its icy twin cannot; deep snow caps a run at ~24; standing still on a Gale Ridge path, the wind blows you off it to the south, while the Weathervane's tower top is out of the wind.
+- Main route, all seven parts:
   - camp → floes → the tilted floe's slide jump → the ice runway → the long jump (a plain jump falls into the water);
   - the deep-snow grabs, the broken iced log, and the slippery ramp;
   - the crevasse jump, the snow bridge, and the chute. It slides at over 80 units a tick, at least eight jump points before the lip clear the Great Crevasse, and sliding off without a jump fails. A good jump collects both arc coins;
-  - the serac grab, 950 units of chimney wall kicks, the rock rib, the bergschrund, and the cairn under the Icefall Star.
-- All five Frost Shards. The watchtower needs a backflip or double jump (a single jump cannot reach it). The Lone Floe needs you to stop on landing. Each of the Great Pine's four boughs is climbed. The crevasse ledge is reached by hanging and dropping, then wall-kicking out. The serac needle needs a double jump (a single jump falls short).
-- The lake's side loop leads back to camp, hop by hop.
-- The upper Horn stays sealed: runs, jumps and double jumps at the Horn's face and the snowbank never stand above y 5,000.
-- The Icefall Star is the goal and stops the clock. With no bonus star in part one, finding every shard reveals nothing yet. The menu objectives name real pickups, and the victory copy counts the shards left.
-- Native/WASM parity: all 80 state bytes on every tick of 300-tick random input streams from each of the six checkpoints, with coin heals mixed in (1,800 ticks).
+  - the serac grab, 950 units of chimney wall kicks, the rock rib, the bergschrund, and the cairn under the Icefall Star;
+  - the ledges west and both breaks (walking off one falls), 800 units of wall kicks between the frozen curtain and the serac (no jump, double jump or backflip reaches its top), the hang across the curtain, which collects the coin along it (no plain or double jump reaches the far ledge), and the rock rib to the top of the falls;
+  - Gale Ridge: onto the first path, then each gap in the wind, path to path;
+  - onto the west ridge's rock steps and up them, the cornice hang to the summit ledge (jumps, double jumps and long jumps from the steps never get there), the chimney's wall kicks (nothing less reaches a tower top), the rock ramp, and the Aurora Star.
+- The Avalanche Run: a steering plan slides from the summit to camp, jumping both lips, and collects all ten of its coins; sliding on without jumping, a lip throws you off.
+- All eight Frost Shards. The watchtower needs a backflip or double jump (a single jump cannot reach it). The Lone Floe needs you to stop on landing. Each of the Great Pine's four boughs is climbed. The crevasse ledge is reached by hanging and dropping, then wall-kicking out. The serac needle needs a double jump (a single jump falls short). The Frozen Falls' pillar is reached by letting go of the overhang, no plain jump from either ledge lands on it, and from it you can hang on to the far ledge. The Weathervane is reached with a jump from the promontory's edge, and home again only with a long jump (a plain jump falls short). The Horn's Tip needs wall kicks up the tor (no jump, double jump or backflip gets above y 11,000).
+- The Polar Star's spire: a double jump and grab reaches its top, a single jump cannot, and the star and its three coins are in reach from there.
+- The session: the Icefall Star leaves the clock running and points on to the Frozen Falls; the Aurora Star stops it; the Polar Star stays hidden until the eighth shard reveals it; the victory copy counts the shards left. The menu objectives name real pickups.
+- Native/WASM parity: all 80 state bytes on every tick of 300-tick random input streams from each of the nine checkpoints, with coin heals mixed in (2,700 ticks).
 
-The shared gameplay tests now include the new world: coins, checkpoint recovery, restart, and frostbite damage with coin healing. The browser check switches between all three worlds, checks Hoarfrost's HUD totals and objectives, and confirms that visiting it leaves the Caldera's progress intact. During development, a scan dropped the explorer over every gap under the route. Every fall either ended below y −1,500, ended in a ledge grab, or landed in the lake. A slope that could have trapped a fall under the bergschrund was removed.
+`tests/audio.test.mjs` covers the level's sound: wind floors hold a gusting wind bed, footsteps are re-mapped to snow and ice, and frostbite water splashes and fizzes instead of burning.
+
+The shared gameplay tests include the level: coins, checkpoint recovery, restart, and frostbite damage with coin healing. The browser check switches between all three worlds, checks Hoarfrost's HUD totals (eight shards) and objectives, and confirms that visiting it leaves the Caldera's progress intact. During development, a scan dropped the explorer over a grid covering the whole level. Every fall either settled somewhere with a way out, ended in a ledge grab, or dropped into the clouds. Slopes that could have trapped a fall (under the bergschrund, a hollow between the Horn and a lesser peak, and slopes running into walls on Gale Ridge) were removed or reshaped.
 
 ## Practical limits
 

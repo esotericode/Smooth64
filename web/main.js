@@ -66,7 +66,7 @@ function buildZoneList() {
 function setMode(next) {
   cancelRespawn();clearTimeout(toastTimer);$('toast').hidden=true;
   mode=next;world=worlds[next];session=sessions[next];debugPaused=false;slow=false;
-  core.loadWorld(world.triangles);renderer.load(world);
+  core.loadWorld(world.triangles);renderer.load(world);audio.setTheme(world.theme?.audio);
   document.body.classList.toggle('caldera',mode==='caldera');document.body.dataset.world=mode;
   buildZoneList();reset(session.checkpoint);applySettings();
   for(const button of document.querySelectorAll('[data-mode]'))button.setAttribute('aria-pressed',button.dataset.mode===mode);

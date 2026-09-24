@@ -1,27 +1,29 @@
-// Hoarfrost Heights, part 1: level integrity, the surface behaviour the level
-// is built on, and a proof that every leg of the main route and every Frost
-// Shard can be reached with real controller input through the actual movement
-// core. Negative checks prove the intended move is needed where it matters,
-// and that the upper Horn (part 2) stays sealed. Timing searches stop at the
-// first success. When part 2 is built, extend this file (docs/HOARFROST.md).
+// Hoarfrost Heights: level integrity, the surface behaviour the level is built
+// on, and a proof that every leg of the main route, every Frost Shard and the
+// Polar Star can be reached with real controller input through the actual
+// movement core. Negative checks prove the intended move is needed where it
+// matters. Timing searches stop at the first success.
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
-import {createHoarfrost,FROSTBITE,ABYSS,PART1_BUDGET,ICE,VERY_SLIPPERY,NOT_SLIPPERY,DEEP_SNOW} from '../web/hoarfrost.js';
+import {createHoarfrost,FROSTBITE,ABYSS,BUDGET,TOP,ICE,VERY_SLIPPERY,NOT_SLIPPERY,DEEP_SNOW,WIND,HANGABLE} from '../web/hoarfrost.js';
 import {LevelSession,bodyCenter,formatTime} from '../web/level.js';
-import {routeKit,hopper,landedOn,standingAbove,touches,range,toward,coreYaw,jump,double,climb,backflip,kicks,families,air,names} from './routes.mjs';
+import {routeKit,hopper,landedOn,standingAbove,touches,range,toward,coreYaw,jump,longJump,double,climb,backflip,kicks,families,air,names} from './routes.mjs';
 
 const world=createHoarfrost();
-const kit=await routeKit(world),{core,reachable,pickup}=kit,hop=hopper(kit);
+const kit=await routeKit(world),{core,run,reachable,pickup}=kit,hop=hopper(kit);
 const N=Math.PI,E=Math.PI/2,W=-Math.PI/2,S=0;
 const dist=(s,[x,z])=>Math.hypot(s.position[0]-x,s.position[2]-z);
 // Hold the stick one way and never press anything.
 const hold=dir=>()=>({dir});
+// Stop pressing anything once hanging: plain jumps that must not use a ceiling.
+const noHang=plan=>(s,n,i,m)=>{if(n.includes('HANG'))m.h=1;return m.h?{dir:null}:plan(s,n,i,m);};
+// A failed attempt from a floor at `y` is over once it falls well below it, or
+// stands on it again after `after` ticks, its jumps spent.
+const settled=(y,after=90)=>(s,n,i)=>s.position[1]<y-100||i>after&&!air(s)&&!n.includes('LEDGE')&&s.floor===y;
 
-// PART 2: raise the counts below (8 shards, 2 stars, 1 bonus, 9 checkpoints,
-// >= 95 coins) and swap PART1_BUDGET for a whole-level budget.
-test('the level is valid static geometry and leaves room for part 2',()=>{
-  assert.ok(world.triangles.length<=PART1_BUDGET,`part 1 uses ${world.triangles.length} of ${PART1_BUDGET} triangles`);
+test('the level is valid static geometry within its triangle budget',()=>{
+  assert.ok(world.triangles.length<=BUDGET,`${world.triangles.length} of ${BUDGET} triangles`);
   assert.ok(world.triangles.length<4096,'core capacity');
   let end=0;
   for(const shape of world.shapes){assert.equal(shape.start,end);assert.ok(shape.end>shape.start);end=shape.end;}
@@ -37,8 +39,7 @@ test('the level is valid static geometry and leaves room for part 2',()=>{
   // A hidden floor under everything, so gaps are gaps and not invisible walls.
   for(const [x,z] of [[-12000,-15000],[9000,13000],[0,0],[-11000,6000],[8000,-20000]])assert.equal(core.floor(x,ABYSS+100,z),ABYSS);
   const kinds=world.pickups.reduce((a,p)=>(a[p.kind]=(a[p.kind]||0)+1,a),{});
-  assert.deepEqual({shard:kinds.shard,star:kinds.star,checkpoint:kinds.checkpoint},{shard:5,star:1,checkpoint:6});
-  assert.ok(kinds.coin>=60);
+  assert.deepEqual(kinds,{shard:8,star:2,bonus:1,checkpoint:9,coin:100});
   assert.equal(new Set(world.pickups.map(p=>p.id)).size,world.pickups.length,'unique pickup ids');
   // Every coin, shard and star hangs over solid ground, not the abyss, except
   // the coins that trace a jump over a gap (tested with that jump).
@@ -88,6 +89,16 @@ test('the surfaces behave as the level assumes',()=>{
   core.reset([-7600,450,2250],coreYaw(W));
   for(let i=0;i<45;i++)s=core.tick({x:0,y:80,buttons:0,yaw:coreYaw(E)});
   assert.ok(s.speed<24.5&&s.speed>20,`deep snow speed ${s.speed}`);
+  // The gale: stand still on a Gale Ridge path and it blows you off its open
+  // edge, south. The Weathervane's tower top is out of it.
+  assert.ok(world.triangles.some(t=>t.type===WIND)&&world.triangles.some(t=>t.type===HANGABLE));
+  const [a,c]=world.gale[0],middle=a.map((v,i)=>Math.round((v+c[i])/2));
+  core.reset(middle,coreYaw(N));let blown=false;
+  for(let i=0;i<60&&!blown;i++){s=core.tick({x:0,y:0,buttons:0,yaw:0});blown=s.position[1]<middle[1]-100&&s.position[2]>middle[2]+140;}
+  assert.ok(blown,'the gale blows you off the path');
+  core.reset(world.vane,coreYaw(N));
+  for(let i=0;i<150;i++)s=core.tick({x:0,y:0,buttons:0,yaw:0});
+  assert.equal(names[s.action],'ACT_IDLE');assert.equal(s.floor,world.vane[1]);
 });
 
 test('main route, part 1: Frostmere Camp across Mirror Lake to the west shore',()=>{
@@ -136,7 +147,7 @@ test('main route, part 3: the glacier, its crevasses and the ice chute',()=>{
   const window=range(0,700,50).filter(d=>reachable([-200,2150,-2775],E,[lipJump(d)],landed,300));
   assert.ok(window.length>=8,`jump windows before the lip: ${window}`);assert.ok(fast>80,`chute speed ${fast}`);
   // The two coins over the crevasse trace a good jump.
-  const arc=world.pickups.filter(p=>p.arc),caught=new Set();
+  const arc=world.pickups.filter(p=>p.arc&&p.section==='Glacier Margin'),caught=new Set();
   assert.ok(reachable([-200,2150,-2775],E,[lipJump(300)],(s,n)=>{for(const c of arc)if(touches(c,95)(s,n))caught.add(c.id);return landed(s);},300));
   assert.equal(caught.size,2,'a good jump collects both arc coins');
   // ...because sliding off without a jump slams into the far wall.
@@ -158,7 +169,7 @@ test('main route, part 4: the icefall to the Shoulder and the Icefall Star',()=>
   assert.ok(hop([4600,-9450],[4200,-9700],4300,4560,{back:250,radius:170}),'onto the cairn');
 });
 
-test('every Frost Shard is reachable, and the hard ones need their intended move',()=>{
+test('the lower Frost Shards are reachable, and the hard ones need their intended move',()=>{
   const reach=(id,start,face,plans,ticks=300)=>assert.ok(reachable(start,face,plans,touches(pickup(id)),ticks),id);
   // Watchtower: the woodshed roof, then a backflip (or double jump) to the lookout.
   assert.ok(hop([1300,12250],[2000,12250],500,900,{back:200,radius:250}),'woodshed roof');
@@ -202,34 +213,198 @@ test('the lake side loop leads back to camp',()=>{
   for(const [from,to,a,b,options] of loop)assert.ok(hop(from,to,a,b,options),`${from} -> ${to}`);
 });
 
-// PART 2: replace this test with route proofs for the Frozen Falls, Gale Ridge,
-// the summit and the Avalanche Run (docs/HOARFROST.md, the part 2 checklist).
-test('part 2 stays sealed: the upper Horn cannot be climbed from the Shoulder',()=>{
-  // Run, jump and double jump north at the Horn's face and west up the snowbank.
-  // (The hut's roof peaks at 4,870; the Horn and the snowbank rise past 5,200.)
-  for(const [x,dir] of [[4600,N],[5200,N],[6300,N],[3700,W]]) {
-    const plans=[hold(dir),...range(0,20,4).map(t=>jump(dir,t,14)),...range(0,20,4).map(t=>double(dir,t,14,14))];
-    assert.ok(!reachable([x,4300,-9450],dir,plans,(s)=>!air(s)&&s.position[1]>5000,160),`sealed at x ${x}`);
+// The Frozen Falls' overhang: from the near ledge, jump up and hang, traverse
+// west and let go over the far ledge.
+const onFarLedge=(s,n)=>!air(s)&&!n.includes('HANG')&&s.position[1]===5300&&s.position[0]<-910;
+const hangWest=(x,wait)=>(s,n,i,m)=>{
+  if(i<wait)return {dir:null};if(m.let||(n.includes('HANG')&&s.position[0]<x))m.let=1;
+  return m.let?{dir:null}:{dir:W,buttons:1};
+};
+
+test('main route, part 5: the ledges west, and up the Frozen Falls',()=>{
+  // Along the foot of the face, broken twice: jump each break.
+  assert.ok(reachable([3700,4300,-10320],W,[hold(W)],(s)=>!air(s)&&s.floor===4300&&s.position[0]<3000,120),'onto the ledge trail');
+  assert.ok(hop([2800,-10335],[2250,-10355],4300,4300,{back:300,radius:200}),'the first break');
+  assert.ok(hop([1900,-10100],[1250,-10100],4300,4300,{back:350,radius:250}),'the second break');
+  assert.ok(!reachable([2100,4300,-10100],W,[hold(W)],(s)=>!air(s)&&s.floor===4300&&s.position[0]<1400,120),'walking off the break falls');
+  // Wall-kick up between the frozen curtain and the serac: nothing less reaches its top.
+  assert.ok(reachable([1050,4300,-10050],N,range(0,8).flatMap(t=>[1,-1].map(first=>kicks(N,S,S,5150,t,first))),
+    (s)=>!air(s)&&s.floor===5100,300),'wall kicks up to the serac');
+  assert.ok(!reachable([1050,4300,-10050],S,[...families.jump(S),...families.double(S),...range(1,10).map(t=>backflip(t,S))],
+    (s)=>!air(s)&&s.floor===5100,120,{lost:settled(4300)}),'the serac needs wall kicks');
+  const d=toward([800,-9700],[380,-10100]);
+  assert.ok(reachable([800,5100,-9700],d,range(0,20,2).flatMap(t=>[8,14].map(h=>jump(d,t,h))),
+    (s)=>!air(s)&&s.position[1]===5300&&s.position[0]<510,120),'from the serac to the near ledge');
+  // Hang from the icicle overhang across the curtain, collecting the coin along
+  // it. No plain or double jump reaches the far ledge (an expert's long jump
+  // from the very edge can just grab its rim).
+  const coin=world.pickups.find(p=>p.arc&&p.section==='The Shoulder');let caught;
+  assert.ok(range(1,10).some(t=>{caught=false;
+    return run([300,5300,-10100],W,hangWest(-960,t),(s,n)=>{caught||=touches(coin,95)(s,n);return onFarLedge(s,n);},600);}),'hang across the curtain');
+  assert.ok(caught,'the hang collects the coin along it');
+  assert.ok(!reachable([490,5300,-10100],W,[...families.jump(W),...families.double(W)].map(noHang),onFarLedge,150,{lost:settled(5300)}),
+    'the far ledge needs the hang');
+  assert.ok(reachable([-1200,5300,-10100],N,[hold(N)],(s)=>!air(s)&&s.floor===6400,200),'up the rock rib to the top of the falls');
+});
+
+// The point `look` ahead of the nearest point to p on a line of [x,z] points.
+function ahead(points,p,look) {
+  const length=k=>Math.hypot(points[k+1][0]-points[k][0],points[k+1][1]-points[k][1]);
+  let best=null;
+  for(let k=0;k<points.length-1;k++) {
+    const a=points[k],L=length(k),u=[(points[k+1][0]-a[0])/L,(points[k+1][1]-a[1])/L];
+    const t=Math.max(0,Math.min(L,(p[0]-a[0])*u[0]+(p[1]-a[1])*u[1])),d=Math.hypot(p[0]-a[0]-u[0]*t,p[1]-a[1]-u[1]*t);
+    if(!best||d<best.d)best={d,k,t};
+  }
+  let {k,t}=best;t+=look;
+  while(k<points.length-2&&t>length(k)){t-=length(k);k++;}
+  const a=points[k],L=length(k);return [a[0]+(points[k+1][0]-a[0])/L*t,a[1]+(points[k+1][1]-a[1])/L*t];
+}
+
+test('main route, part 6: Gale Ridge, jumping each gap from its very edge',()=>{
+  const G=world.gale.map(([a,c])=>[[a[0],a[2]],[c[0],c[2]]]);
+  // Steer along the paths and jump once within `d` of `at`, holding A for `h`.
+  const follow=(points,at,d,h)=>(s,n,i,m)=>{
+    const p=[s.position[0],s.position[2]];
+    if(at&&m.j===undefined&&!air(s)&&Math.hypot(p[0]-at[0],p[1]-at[1])<d)m.j=i;
+    return {dir:toward(p,ahead(points,p,250)),buttons:m.j!==undefined&&i<m.j+h?1:0};
+  };
+  assert.ok(reachable([-1200,6400,-11350],W,[follow([[-1200,-11350],...G[0]])],
+    (s)=>!air(s)&&Math.abs(s.floor-world.gale[0][1][1])<200&&dist(s,G[0][1])<150,200),'from the top of the falls onto the path');
+  for(const k of range(0,4)) {
+    const [a,c]=G[k],f=50/Math.hypot(c[0]-a[0],c[1]-a[1]),y=world.gale[k][0][1]+(world.gale[k][1][1]-world.gale[k][0][1])*f;
+    const landed=(s,n)=>!air(s)&&!n.includes('LEDGE')&&dist(s,G[k+1][0])<400&&Math.abs(s.position[1]-world.gale[k+1][0][1])<60;
+    assert.ok(range(0,160,20).some(d=>range(8,16,4).some(h=>run([a[0]+(c[0]-a[0])*f,y,a[1]+(c[1]-a[1])*f],toward(a,c),
+      follow([...G[k],...G[k+1]],c,d,h),landed,300))),`path ${k+1} to path ${k+2}`);
   }
 });
 
-// PART 2: the Aurora Star becomes the goal; all 8 shards reveal the Polar Star.
-test('level session: the Icefall Star is the goal and stops the clock',()=>{
-  const session=new LevelSession(world);
+// The crest of the Horn's west ridge at x: the z where the Horn stands highest.
+const crest=x=>range(-15500,-13500,10).reduce((best,z)=>world.horn(x,z)>world.horn(x,best)?z:best,-15500);
+
+test('main route, part 7: the west ridge, the cornice and the chimney to the Aurora Star',()=>{
+  const steps=world.steps,[g0,g1]=world.gale[5];
+  // From the last gale path onto the first rock step, then up the steps.
+  assert.ok(range(.5,.9,.1).some(f=>{
+    const p=[g0[0]+(g1[0]-g0[0])*f,g0[2]+(g1[2]-g0[2])*f],d=toward(p,[steps[0][0],steps[0][2]]);
+    return reachable([p[0],g0[1]+(g1[1]-g0[1])*f,p[1]],d,families.jump(d),(s,n)=>!air(s)&&!n.includes('LEDGE')&&Math.abs(s.floor-steps[0][1])<2,200);
+  }),'onto the first rock step');
+  for(let k=0;k<3;k++) {
+    const [a,b]=[steps[k],steps[k+1]],d=toward([a[0],a[2]],[b[0],b[2]]);
+    assert.ok(reachable([a[0]-Math.sin(d)*80,a[1],a[2]-Math.cos(d)*80],d,families.jump(d),
+      (s,n)=>!air(s)&&!n.includes('LEDGE')&&Math.abs(s.floor-b[1])<2,200),`rock step ${k+2}`);
+  }
+  // The cornice: hang from its underside all the way along; the slick crest
+  // beneath it cannot be climbed.
+  const [c0,c1]=world.cornice,along=x=>c0[2]+(c1[2]-c0[2])*(x-c0[0])/(c1[0]-c0[0]),top=steps[3];
+  const hangEast=wait=>(s,n,i,m)=>{
+    if(i<wait)return {dir:E};const p=[s.position[0],s.position[2]];
+    if(m.let||(n.includes('HANG')&&p[0]>c1[0]-25))m.let=1;
+    return m.let?{dir:null}:{dir:toward(p,[p[0]+300,along(p[0])]),buttons:1};
+  };
+  const onLedge=(s,n)=>!air(s)&&!n.includes('HANG')&&s.position[1]===8500;
+  assert.ok(range(0,12,2).some(t=>run([top[0]-60,top[1],top[2]],E,hangEast(t),onLedge,700)),'along the cornice to the summit ledge');
+  assert.ok(!reachable([top[0]-60,top[1],top[2]],E,[...families.jump(E),...families.double(E),...families.long(E),hold(E)].map(noHang),
+    (s)=>!air(s)&&s.position[1]>=8490,300,{lost:settled(top[1])}),'the summit ledge needs the cornice');
+  // The chimney: wall-kick up between the two towers; nothing less reaches a top.
+  const z=crest(-3520);
+  assert.ok(reachable([-3700,8500,z],E,range(0,10).flatMap(t=>[1,-1].map(first=>(s,n,i,m)=>i<12?{dir:E,mag:40}:kicks(N,S,S,9450,t+12,first)(s,n,i,m))),
+    (s,n)=>!air(s)&&!n.includes('LEDGE')&&s.position[1]===9400,400),'wall kicks up the chimney');
+  assert.ok(!reachable([-3700,8500,z],E,[...families.jump(E),...families.double(E),...range(1,10).map(t=>backflip(t,E))],
+    (s)=>!air(s)&&s.floor>=9390,200,{lost:settled(8500)}),'the chimney needs wall kicks');
+  // The rock ramp to the summit snowfield, and a hop onto the cairn for the star.
+  assert.ok(reachable([-3400,9400,crest(-3400)+370],E,[s=>({dir:toward([s.position[0],s.position[2]],[-600,-14550])})],
+    (s)=>!air(s)&&s.position[1]===TOP&&s.position[0]>-900,400),'up the ramp to the summit');
+  assert.ok(reachable([-300,TOP,-14750],S,families.jump(S),touches(pickup('aurora-star'),150),150),'the Aurora Star');
+});
+
+test('the Avalanche Run: slide home from the summit, jumping both lips',()=>{
+  const points=world.avalanche.flat().map(p=>[p[0],p[2]]),lips=world.avalanche.slice(0,-1).map(run=>run.at(-1));
+  const coins=world.pickups.filter(p=>p.kind==='coin'&&p.section==='Summit Ledge'&&p.position[0]>500);
+  assert.equal(coins.length,10);
+  // Steer along the run, bending toward the nearest coin ahead, and jump
+  // within `d` of each lip, holding A for `h`.
+  const slide=(d,h,got)=>(s,n,i,m)=>{
+    const p=[s.position[0],s.position[2]],v=[s.velocity[0],s.velocity[2]],speed=Math.hypot(...v)||1;
+    const next=coins.filter(c=>!got.has(c.id)&&!c.arc).map(c=>({c,d:Math.hypot(c.position[0]-p[0],c.position[2]-p[1]),
+      ahead:((c.position[0]-p[0])*v[0]+(c.position[2]-p[1])*v[1])/speed})).filter(o=>o.ahead>150&&o.d<1200).sort((a,b)=>a.d-b.d)[0];
+    let buttons=0;
+    lips.forEach((e,k)=>{if(m[k]===undefined&&!air(s)&&Math.hypot(p[0]-e[0],p[1]-e[2])<d)m[k]=i;if(m[k]!==undefined&&i<m[k]+h)buttons=1;});
+    return {dir:toward(p,next?[next.c.position[0],next.c.position[2]]:ahead(points,p,600)),buttons};
+  };
+  const home=(s)=>!air(s)&&s.floor===500&&s.position[0]<2600,got=new Set();
+  assert.ok(run([150,TOP,-14350],E,slide(250,3,got),(s,n)=>{for(const c of coins)if(touches(c,95)(s,n))got.add(c.id);return home(s);},600),'summit to camp');
+  assert.equal(got.size,coins.length,'the racing line and a jump at each lip collect every coin');
+  assert.ok(!run([150,TOP,-14350],E,slide(0,0,new Set()),home,600),'slide on without jumping and a lip throws you off');
+});
+
+test('the upper Horn\'s Frost Shards are reachable, and need their intended moves',()=>{
+  const reach=(id,start,face,plans,ticks=300)=>assert.ok(reachable(start,face,plans,touches(pickup(id)),ticks),id);
+  // The Frozen Falls: let go of the overhang above the ice pillar...
+  reach('shard-falls',[300,5300,-10100],W,range(1,6).flatMap(t=>range(-350,-250,20).map(x=>(s,n,i,m)=>{
+    if(i<t)return {dir:null};if(m.let||(n.includes('HANG')&&s.position[0]<x)){m.let=1;return {dir:null};}
+    return {dir:toward([s.position[0],s.position[2]],[-300,-10100]),buttons:1};})),600);
+  // ...jump back up to it and hang on to the far ledge. The flared cap cannot
+  // be grabbed, and no plain jump from either ledge lands on it.
+  assert.ok(range(0,6).some(t=>run([-300,5300,-10100],W,hangWest(-960,t),onFarLedge,600)),'from the pillar on to the far ledge');
+  const onPillar=(s,n)=>!air(s)&&!n.includes('HANG')&&Math.hypot(s.position[0]+300,s.position[2]+10100)<170&&s.position[1]>5290;
+  const plain=dir=>[...range(0,30).flatMap(t=>[1,2,3,4,6,8,14].map(h=>noHang(jump(dir,t,h)))),hold(dir)];
+  assert.ok(!reachable([490,5300,-10100],W,plain(W),onPillar,120,{lost:settled(5300)}),'no plain jump from the near ledge lands on the pillar');
+  assert.ok(!reachable([-1390,5300,-10100],E,plain(E),onPillar,120,{lost:settled(5300)}),'nor from the far ledge');
+  // The Weathervane: out across the windy gulf with a jump from the very edge;
+  // home into the wind only a long jump makes it.
+  const [x,y,z]=world.vane,cape=world.cape[2];
+  const onTower=(s,n)=>!air(s)&&!n.includes('LEDGE')&&s.position[1]===y&&s.position[2]>z-335;
+  const onCape=(s,n)=>!air(s)&&!n.includes('LEDGE')&&s.position[1]===y&&s.position[2]>cape-60&&s.position[2]<cape+485;
+  assert.ok(reachable([x,y,cape+20],S,families.jump(S),onTower,160),'out to the Weathervane');
+  reach('shard-vane',[x,y,z-270],S,[hold(S)],60);
+  assert.ok(!reachable([x,y,z+270],N,families.jump(N),onCape,160,{lost:settled(y)}),'a plain jump home falls short in the gale');
+  assert.ok(reachable([x,y,z+270],N,range(2,40).flatMap(t=>[6,10,14].map(h=>longJump(N,t,h))),onCape,160),'a long jump makes it home');
+  // The Horn's Tip: wall-kick between the needle and the tor to the tor's top,
+  // then jump across to the needle. Nothing else gets that high.
+  assert.ok(reachable([-60,TOP,-14850],E,range(0,10).flatMap(t=>[1,-1].map(first=>kicks(E,W,E,11100,t,first))),
+    standingAbove(11040,[-420,-14850],260),300),'wall kicks up to the tor');
+  reach('shard-tip',[-520,11050,-14850],E,families.jump(E),150);
+  assert.ok(!reachable([-500,TOP,-14500],E,[...families.jump(E),...families.double(E),...range(1,10).map(t=>backflip(t,E))],
+    (s)=>s.position[1]>11000,200,{lost:settled(TOP)}),'the tip needs wall kicks');
+});
+
+test('every shard reveals the Polar Star, atop the Mirror Isle\'s ice spire',()=>{
+  const spire=[1500,5700],sides=[90,180,270,0].map(deg=>{
+    const a=deg*Math.PI/180,from=[spire[0]+Math.cos(a)*550,spire[1]-Math.sin(a)*550];return [from,toward(from,spire)];});
+  assert.ok(sides.some(([from,d])=>reachable([from[0],250,from[1]],d,families.double(d),standingAbove(760,spire,180),220)),'a double jump and a grab');
+  assert.ok(!sides.slice(0,2).some(([from,d])=>reachable([from[0],250,from[1]],d,families.jump(d),standingAbove(760,spire,180),100,{lost:settled(250)})),
+    'a single jump cannot');
+  core.reset([1500,770,5700],0);const s=core.tick({x:0,y:0,buttons:0,yaw:0});
+  assert.ok(touches(pickup('polar-star'),150)(s,'ACT_IDLE'),'the star is in reach from the top');
+  const arc=world.pickups.filter(p=>p.kind==='coin'&&Math.hypot(p.position[0]-spire[0],p.position[2]-spire[1])<100);
+  assert.equal(arc.length,3);for(const c of arc)assert.ok(touches(c,95)(s,'ACT_IDLE'),c.id);
+});
+
+test('level session: the Aurora Star stops the clock, and every shard reveals the Polar Star',()=>{
+  const session=new LevelSession(world),shards=()=>session.count('shard');
   const standAt=p=>({position:[p[0],p[1]-80,p[2]],yaw:0,velocity:[0,0,0],speed:0,health:0x880,action:0x0C400201,animation:197,frame:0,tick:0});
+  const take=id=>session.collect(standAt(pickup(id).position),'ACT_IDLE').map(e=>e.type);
+  const copy=(id,best)=>world.text.victory('star',{session,shards:shards(),best,pickup:pickup(id)}).copy;
   for(let i=0;i<30;i++)session.tick({x:0,y:80,buttons:0});
-  assert.deepEqual(session.collect(standAt(pickup('icefall-star').position),'ACT_IDLE').map(e=>e.type),['star']);
+  // The Icefall Star, halfway up, leaves the clock running and points onward...
+  assert.deepEqual(take('icefall-star'),['star']);assert.match(copy('icefall-star'),/west to the Frozen Falls/);
   for(let i=0;i<30;i++)session.tick({x:0,y:80,buttons:0});
-  assert.equal(formatTime(session.time),'0:01.0');assert.equal(session.stars,1);
-  // No bonus star in part 1, so finding every shard reveals nothing yet.
+  assert.equal(formatTime(session.time),'0:02.0');
+  // ...and the Aurora Star at the summit stops it.
+  assert.deepEqual(take('aurora-star'),['star']);
+  for(let i=0;i<30;i++)session.tick({x:0,y:80,buttons:0});
+  assert.equal(formatTime(session.time),'0:02.0');assert.equal(session.stars,2);
+  assert.match(copy('aurora-star','1:00.0'),/best 1:00\.0\. 8 Frost Shards still hide on the mountain\. Ride the Avalanche Run/);
+  // The Polar Star stays hidden until the eighth shard is found.
+  assert.deepEqual(take('polar-star'),[]);
   const events=world.pickups.filter(p=>p.kind==='shard').flatMap(p=>session.collect(standAt(p.position),'ACT_IDLE'));
-  assert.equal(events.filter(e=>e.type==='shard').length,5);assert.ok(!events.some(e=>e.type==='reveal'));
+  assert.deepEqual(events.map(e=>e.type),[...Array(8).fill('shard'),'reveal']);
+  assert.deepEqual(take('polar-star'),['bonus']);assert.equal(session.stars,3);
+  assert.match(copy('polar-star'),/Hoarfrost Heights is conquered/);
   // The copy the menu and victory dialog show.
-  assert.equal(world.goal,'icefall-star');
+  assert.equal(world.goal,'aurora-star');
   for(const goal of world.text.objectives.filter(g=>g.star))assert.ok(pickup(goal.star),goal.star);
-  const shards=session.count('shard');
-  assert.match(world.text.victory('star',{session,shards,best:'1:00.0'}).copy,/every Frost Shard/);
-  assert.match(world.text.victory('star',{session,shards:{found:3,total:5},best:'1:00.0'}).copy,/best 1:00.0\. 2 Frost Shards still hide/);
 });
 
 test('native GCC and WASM agree on every byte in Hoarfrost Heights',()=>{

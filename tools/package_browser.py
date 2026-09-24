@@ -90,13 +90,16 @@ wedges of health; coins heal one. Touch beacons to set your checkpoint (R return
 there). Eight red Ember Shards hide behind optional challenges; all eight light
 the Crimson Star on the lava altar.
 
-HOARFROST HEIGHTS (new, part one): cross the frozen lake, the snowbound forest
-and the glacier, then climb the icefall to the Icefall Star on the Horn's
-Shoulder. Blue ice will not hold you: you slide on it, cannot climb it, and a
-full run skids a long way. Let go of the stick as you land to stop dead. Deep
-snow slows your run; grey rock grips even when steep. Open water bites like
-lava. Five blue Frost Shards hide behind optional challenges. The upper Horn
-is snowed in for now.
+HOARFROST HEIGHTS (new): cross the frozen lake, the snowbound forest and the
+glacier, climb the icefall to the Icefall Star on the Horn's Shoulder, then go
+on up the Frozen Falls, across windy Gale Ridge and up the west ridge to the
+Aurora Star on the summit. Ride the Avalanche Run home. Blue ice will not hold
+you: you slide on it, cannot climb it, and a full run skids a long way. Let go
+of the stick as you land to stop dead. Deep snow slows your run; grey rock grips
+even when steep. The gale on Gale Ridge always blows one way: keep moving, and
+jump gaps from their very edge. Open water bites like lava. Eight blue Frost
+Shards hide behind optional challenges; all eight light the Polar Star on the
+Mirror Isle.
 
 PLAYGROUND: eleven practice areas, including the new lava crossing. Find 34
 healing coins across the original courses and trails. Menu > Practice destinations

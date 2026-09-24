@@ -2,14 +2,11 @@
 //
 // A high valley floats on a sea of cloud under the Hoarfrost Horn. The route
 // crosses a frozen lake, climbs a snowbound pine forest, rides a glacier chute
-// and scales an icefall to the Shoulder, halfway up the mountain.
-//
-// PART 1 (built): Frostmere Camp -> Mirror Lake -> Pinewood Drifts -> the
-//   Glacier -> the Icefall -> the Shoulder and the Icefall Star.
-// PART 2 (planned, NOT built): the upper Horn, from the Shoulder to the summit's
-//   Aurora Star, a long slide home, three more Frost Shards and the Polar Star.
-//   The full plan, coordinates, budgets and a checklist are in
-//   docs/HOARFROST.md. Search this file for "PART 2" to find every hook.
+// and scales an icefall to the Shoulder and the Icefall Star, halfway up. Then
+// it climbs the Frozen Falls, crosses Gale Ridge in a wind that always blows
+// south, hangs from the Cornice up the west ridge to the summit's Aurora Star,
+// and slides home down the Avalanche Run. Eight Frost Shards reveal the Polar
+// Star on the Mirror Isle. docs/HOARFROST.md has the design notes.
 //
 // Rendering and collision consume these SAME integer triangles (builder.js).
 // Coordinates are SM64 units, Y up; +X east, -Z north. Surfaces come from the
@@ -24,10 +21,10 @@
 // hidden floor at y=-2600 catches every gap so jumps over the void are legal.
 import {SURFACE} from './rules.js';
 import {createBuilder,paint} from './builder.js';
-export const FROSTBITE=SURFACE.LAVA,{HANGABLE,DEEP_SNOW,SLIPPERY,VERY_SLIPPERY,NOT_SLIPPERY,ICE}=SURFACE;
-export const ABYSS=-2600,CLOUD=-700;
-// Part 1 keeps to this many triangles so part 2 has room; the core holds 4,096.
-export const PART1_BUDGET=2200;
+export const FROSTBITE=SURFACE.LAVA,{HANGABLE,DEEP_SNOW,SLIPPERY,VERY_SLIPPERY,NOT_SLIPPERY,ICE,WIND}=SURFACE;
+export const ABYSS=-2600,CLOUD=-700,TOP=10100;
+// The level keeps to this many triangles; the core holds 4,096.
+export const BUDGET=3000;
 
 export const checkpoints=[
   {id:'camp',name:'Frostmere Camp',note:'The Horn waits to the north. Cross Mirror Lake to the west shore. Floes are safe; open water bites.',
@@ -40,13 +37,19 @@ export const checkpoints=[
     position:[-3500,1800,-2600],yaw:16384,camera:-Math.PI/2},
   {id:'icefall',name:'Icefall Foot',note:'Climb the icefall: a ledge, a chimney, then the rock rib. Ice will not hold you; rock will.',
     position:[4600,2300,-5350],yaw:-32768,camera:0,pitch:.35},
-  {id:'shoulder',name:'The Shoulder',note:'Halfway up the Horn. The upper trail is snowed in for now.',
+  {id:'shoulder',name:'The Shoulder',note:'Halfway up the Horn. Follow the ledges west to the Frozen Falls.',
     position:[4900,4300,-9350],yaw:-32768,camera:0},
+  {id:'falls',name:'Top of the Falls',note:'Gale Ridge climbs west. The gale always blows south: keep moving, and jump each gap from its very edge.',
+    position:[300,6400,-10800],yaw:-16384,camera:Math.PI/2},
+  {id:'ridge',name:'Gale Ridge',note:'A shelter from the gale. Go north into the wind, then up the west ridge: rock steps, and a cornice to hang from.',
+    position:[-4760,6700,-12690],yaw:-24576,camera:Math.PI*3/4},
+  {id:'summit',name:'Summit Ledge',note:'Wall-kick up the chimney between the two towers, then follow the rock ramp to the summit.',
+    position:[-3700,8500,-14425],yaw:16384,camera:-Math.PI/2},
 ];
 
-// The main route's waypoints, in order ([x,y,z] on each floor): the map tool
-// draws them, and tests/hoarfrost.test.mjs proves each leg. PART 2 continues
-// from the last one (the Shoulder) toward the summit.
+// The main route's waypoints up to the Shoulder, in order ([x,y,z] on each
+// floor): the map tool draws them, and tests/hoarfrost.test.mjs proves each
+// leg. createHoarfrost adds the climb above the Shoulder and the slide home.
 export const route=[
   [-300,500,11300],[-1600,100,9250],[-2650,130,8350],[-3350,180,7150],[-4430,90,6080],[-5900,100,4700],
   [-7000,450,3000],[-7000,850,1800],[-7400,850,780],[-7250,930,120],[-7400,1000,-620],[-7000,1400,-2000],
@@ -58,7 +61,9 @@ export const sections=[
   {name:'Frostmere Camp',position:[0,500,11500]},{name:'Mirror Lake',position:[-2600,100,8200]},
   {name:'Pinewood Drifts',position:[-7500,450,2600]},{name:'Pinewood Ravine',position:[-7400,850,0]},
   {name:'The Glacier',position:[-1000,2000,-2600]},{name:'The Icefall',position:[4500,2800,-6000]},
-  {name:'The Shoulder',position:[4700,4300,-8100]},
+  {name:'The Shoulder',position:[4700,4300,-8100]},{name:'The Frozen Falls',position:[300,5300,-10100]},
+  {name:'Gale Ridge',position:[-3000,6500,-11700]},{name:'The Cornice',position:[-4200,8200,-14420]},
+  {name:'The Summit',position:[-300,10100,-14600]},
 ];
 
 // [walkable top, side, styles]. Snow reads white, slick ice reads blue, grippy
@@ -80,6 +85,9 @@ const PALETTE={
   serac:paint('#e3eef7','#6aa6d0','snow','ice'),
   crag:paint('#e9eef6','#707584','snow','rock'),
   horn:paint('#eef3fa','#7a8092','snow','rock'),
+  falls:paint('#eef5fb','#9fd4ef','snow','ice'),
+  gale:paint('#d9e1ee','#747b8d','snow','rock'),
+  luge:{top:'#c4e8f8',side:'#6fa7cd',rim:'#eef5fb'},
   water:paint('#1f5268','#565c6c','frost','rock'),
   hidden:paint('#000000','#000000','hidden','hidden'),
 };
@@ -163,7 +171,7 @@ export function createHoarfrost() {
   floe(-450,6450,200,90,PALETTE.ice,ICE,6);
   pickup('shard','shard-floe',-450,170,6450,{hint:'Mirror Lake: the lone ice floe. Land and let go of the stick at once.'});
   floe(350,6000,340,100);
-  // Mirror Isle. PART 2: the Polar Star (the bonus star) appears here.
+  // Mirror Isle, where the Polar Star appears on an ice spire (section 11).
   slab(blob(1500,5700,700,9,10),-150,250,PALETTE.cliff,0,{lip:60});
   floe(1700,7300,380,110);floe(1000,8450,420,120);floe(200,9500,430,110);
   // Drifting ice sheets in the open east of the lake.
@@ -263,23 +271,24 @@ export function createHoarfrost() {
 
   // ---- 6. The Shoulder ---------------------------------------------------------
   // A snowy saddle on the Horn's flank, beyond one last gap (the bergschrund).
-  slab([[3400,-10200],[5000,-10350],[6400,-10000],[6600,-9550],[6300,-9150],[4800,-9100],[3400,-9200]],-1400,4300,PALETTE.cliff,0,{lip:70});
+  // It runs back to the Horn's sheer south face, so no crack opens between them.
+  slab([[3400,-10453],[5000,-10420],[5000,-9100],[4800,-9100],[3400,-9200]],-1400,4300,PALETTE.cliff,0,{lip:70,skip:[0,1]});
+  slab([[5000,-10420],[6400,-10756],[6600,-9550],[6300,-9150],[5000,-9100]],-1400,4300,PALETTE.cliff,0,{lip:70,skip:[0,4]});
   box(5500,6100,-9500,-9200,4300,4650,PALETTE.wood);
   tent(5800,-9350,680,420,220,0,4650);
   column(4200,-9700,180,4300,4560,PALETTE.dark,6,10);
   pickup('star','icefall-star',4200,4700,-9700);
   coins(arc(4900,4380,-9550,280,4,45),'The Shoulder');
-  // PART 2 HOOK: the trail west is "snowed in" by this bank. Part 2 removes
-  // it and continues the route west along the Shoulder (docs/HOARFROST.md).
-  slab([[2900,-10200],[3500,-10200],[3500,-9100],[2900,-9100]],-1400,[5200,4300,4300,5200],PALETTE.drift,VERY_SLIPPERY);
 
-  // ---- The Horn (placeholder massing) -------------------------------------------
-  // PART 2 HOOK: the upper mountain. Its flanks are steep, very slippery
-  // floors; its south face is a near-vertical cliff right behind the Shoulder,
-  // so part 1 is sealed and every gap below the route stays open to the void.
-  // Part 2 sculpts the route up the Horn to the summit (docs/HOARFROST.md).
+  // ---- The Hoarfrost Horn -----------------------------------------------------------
+  // A faceted peak whose flanks are steep, very slippery floors: the route up
+  // is built onto it, and every path meets its slope flush, so a slide down
+  // the Horn lands on a path or leaves the mountain, never wedges against a wall.
+  // The south face is sheer (its corners stand straight under the 5,200 ring):
+  // a true wall, which ledges can meet cleanly. A merely steep face is a floor,
+  // and the explorer can slip into a crack behind anything built against it.
   const horn=[
-    [[11200,-13500],[10600,-11400],[8800,-10300],[6200,-10000],[3000,-10050],[-800,-10150],[-4600,-10400],
+    [[11200,-13500],[10600,-11400],[7000,-10900],[5000,-10420],[2600,-10470],[-800,-10700],[-4000,-11200],
       [-8600,-11000],[-11200,-12400],[-11800,-15600],[-10000,-19200],[-5600,-21400],[1200,-21800],[7600,-19800]].map(([x,z])=>[x,-1400,z]),
     [[8200,-13600],[7800,-11700],[7000,-10900],[5000,-10420],[2600,-10470],[-800,-10700],[-4000,-11200],
       [-6800,-12000],[-8300,-13600],[-8600,-15900],[-7200,-18400],[-3800,-19700],[1400,-19800],[6000,-18100]].map(([x,z])=>[x,5200,z]),
@@ -289,22 +298,203 @@ export function createHoarfrost() {
   // Flute the upper rings into ridges and gullies, pulled toward the summit.
   const summit=[-300,10600,-14600],flute=(ring,y,k,twist)=>ring.map(([x,,z],i)=>{
     const f=k*(i%2?.9:1.04)+(i+twist)%3*.01;return [summit[0]+(x-summit[0])*f,y,summit[2]+(z-summit[2])*f];});
-  horn.push(flute(horn[2],9000,.55,1));horn[2]=flute(horn[2],7800,1,0);
-  mountain(horn,summit,PALETTE.horn,VERY_SLIPPERY);
-  // Two lesser peaks on the Horn's shoulders.
+  // The summit is a small flat snowfield at 10,100: the apex is level with the top ring.
+  horn.push(flute(horn[2],9000,.55,1),flute(horn[2],TOP,.55*(summit[1]-TOP)/1600,1));horn[2]=flute(horn[2],7800,1,0);
+  const hornAt=mountain(horn,[summit[0],TOP,summit[2]],PALETTE.horn,VERY_SLIPPERY,{colors:PALETTE.snow,type:0});
+  // A lesser peak on the Horn's east shoulder. (A west one made a closed hollow
+  // with the Horn below the west ridge, where a fall could slide forever.)
   mountain([ring(5600,-13400,2600,8,10).map(([x,z])=>[x,4600,z])],[5900,8200,-13300],PALETTE.horn,VERY_SLIPPERY);
-  mountain([ring(-6200,-14600,2400,7,30).map(([x,z])=>[x,4400,z])],[-6600,7600,-14900],PALETTE.horn,VERY_SLIPPERY);
+  // The foot of the sheer south face (the 5,200 ring) at any x: ledges meet it here.
+  const face=x=>{const k=[[-4000,-11200],[-800,-10700],[2600,-10470],[5000,-10420],[7000,-10900]],i=Math.max(0,Math.min(3,k.findIndex(p=>p[0]>x)-1));
+    return k[i][1]+(x-k[i][0])*(k[i+1][1]-k[i][1])/(k[i+1][0]-k[i][0]);};
+  // A path cut into the Horn from [x,z] a to c, its top rising from h0 to h1:
+  // `w` wide where it stands out of the slope, then running on under the slope
+  // so the Horn flows onto it (a wall there would trap anyone sliding down).
+  // Returns its centre line's ends, for coins and the route.
+  function cut(a,c,h0,h1,w,colors,type=0,{depth=450,skip=[]}={}) {
+    const len=Math.hypot(c[0]-a[0],c[1]-a[1]),n0=[(a[1]-c[1])/len,(c[0]-a[0])/len],m=[(a[0]+c[0])/2,(a[1]+c[1])/2];
+    const n=hornAt(m[0]+n0[0]*300,m[1]+n0[1]*300)>hornAt(m[0]-n0[0]*300,m[1]-n0[1]*300)?n0:n0.map(v=>-v);
+    const at=(p,k)=>[p[0]+n[0]*k,p[1]+n[1]*k],edge=(p,h)=>{let k=-2000;while(k<3000&&!(hornAt(...at(p,k))>=h))k+=5;return at(p,k);};
+    const ea=edge(a,h0),ec=edge(c,h1);
+    slab([at(ea,-w),at(ec,-w),at(ec,depth),at(ea,depth)],Math.min(h0,h1)-800,[h0,h1,h1,h0],colors,type,{bottom:true,lip:40,skip:[2,...skip]});
+    return [[...at(ea,-w/2),h0],[...at(ec,-w/2),h1]].map(([x,z,h])=>[R(x),h,R(z)]);
+  }
+
+  // ---- 7. The Frozen Falls -----------------------------------------------------
+  // A ledge trail runs west from the Shoulder along the foot of the face, broken
+  // twice. The falls are a block of ice against the face: kick up between its
+  // curtain and a free-standing serac, hop to a ledge, hang from the icicle
+  // overhang across the curtain, then climb the rock rib to the top.
+  slab([[3400,face(3400)],[2750,face(2750)],[2750,face(2750)+260],[3400,face(3400)+260]],4000,4300,PALETTE.snow,0,{bottom:true,lip:60,skip:[0,3]});
+  slab([[2400,face(2400)],[1850,-10230],[1850,-9970],[2400,face(2400)+260]],4000,4300,PALETTE.snow,0,{bottom:true,lip:60});
+  box(700,1400,-10250,-9850,4000,4300,PALETTE.snow,0,{bottom:true,lip:60,skip:[0,2]});
+  box(700,1400,-9850,-9550,-1400,5100,PALETTE.serac,0,{lip:50});
+  // The falls: the curtain faces south, and the top runs back under the Horn's
+  // slope (the rock rib takes its south-west corner).
+  box(-1000,1550,-11800,-10250,-1400,6400,PALETTE.falls,0,{lip:60,skip:[0]});
+  box(-1000,350,-10250,-9950,5600,6400,PALETTE.falls,0,{bottom:true,bottomType:HANGABLE,skip:[0]});
+  box(250,500,-10250,-9950,5000,5300,PALETTE.snow,0,{bottom:true,lip:40,skip:[0]});
+  box(-1400,-900,-10250,-9950,5000,5300,PALETTE.snow,0,{bottom:true,lip:40,skip:[0]});
+  slab([[-1400,-10250],[-1000,-10250],[-1000,-11200],[-1400,-11200]],5000,[5300,5300,6400,6400],PALETTE.rock,NOT_SLIPPERY,{bottom:true,skip:[0,1,2]});
+  box(-1400,-1000,-11800,-11200,5800,6400,PALETTE.snow,0,{bottom:true,skip:[0,1,2]});
+  // Under the icicles: an ice pillar with a flared cap. The cap overhangs, so
+  // its rim cannot be grabbed: let go of the overhang above it instead.
+  column(-300,-10100,60,-1400,5050,PALETTE.serac,6,30,0,{roof:false});
+  {
+    const top=ring(-300,-10100,150,6,30),foot=ring(-300,-10100,60,6,30);
+    b.face(top.map(([x,z])=>[x,5300,z]),PALETTE.serac.top,0,[0,1,0],'snow');
+    top.forEach((p,i)=>{const q=top[(i+1)%6];
+      b.face([[p[0],5300,p[1]],[q[0],5300,q[1]],[foot[(i+1)%6][0],5050,foot[(i+1)%6][1]],[foot[i][0],5050,foot[i][1]]],PALETTE.serac.side,0,[p[0]+q[0]+600,-1,p[1]+q[1]+20200],'ice');});
+  }
+  pickup('shard','shard-falls',-300,5390,-10100,{hint:'The Frozen Falls: an ice pillar under the icicles. Let go of the overhang above it.'});
+  coins([[3075,4380,face(3075)+130],[2125,4380,-10227],[1250,4380,-10050],[1050,4750,-10050],[1050,5000,-10050],[375,5380,-10100],[-1200,5900,-10700]],'The Shoulder');
+  // One coin waits along the hang, high over the gap.
+  coins([[0,5506,-10100]],'The Shoulder',{arc:true});
+
+  // ---- 8. Gale Ridge -----------------------------------------------------------
+  // A path cut into the Horn's south face climbs west from the top of the falls,
+  // in a gale that always blows south: it pushes you off the path's open edge,
+  // so keep moving and jump the gaps from their very edge.
+  const gale=[
+    cut([-1400,-11450],[-2150,-11450],6400,6450,280,PALETTE.gale,WIND,{skip:[3]}),
+    cut([-2450,-11500],[-3050,-11500],6500,6550,280,PALETTE.gale,WIND),
+    cut([-3560,-11700],[-4100,-12000],6600,6650,280,PALETTE.gale,WIND),
+    // The shelter in the south-west gully: ordinary rock, out of the gale.
+    cut([-4570,-12360],[-5080,-12900],6700,6700,450,PALETTE.crag,0),
+    // The headwind stretch: north, straight into the gale, to the west ridge.
+    cut([-5130,-13150],[-5350,-13650],6750,6900,280,PALETTE.gale,WIND),
+    cut([-5600,-13930],[-5660,-14130],6950,7000,280,PALETTE.gale,WIND),
+  ];
+  // A rock promontory juts south from the path. The Weathervane stands on a
+  // rock tower 600 beyond it, across a gulf where the gale blows: a hidden
+  // patch of wind floor far below means no steering in the air over it, and a
+  // push south. Going out, jump from the very edge; coming home into the wind
+  // only a long jump with a full run-up gets there.
+  const cape=R((gale[1][0][2]+gale[1][1][2])/2+160);
+  box(-2950,-2550,cape-60,cape+480,5000,6525,PALETTE.crag,0,{lip:60});
+  slab(blob(-2750,cape+1410,330,9,15),-1400,6525,PALETTE.crag,0,{lip:60});
+  box(-3150,-2350,face(-2750),cape+1090,ABYSS-10,ABYSS+1,PALETTE.hidden,WIND,{walls:false});
+  const mid=([a,c],h=80)=>[R((a[0]+c[0])/2),R((a[1]+c[1])/2+h),R((a[2]+c[2])/2)];
+  coins([mid(gale[0]),mid(gale[1]),[-2750,6605,cape+300],[-2750,6605,cape+1150],mid(gale[2])],'Top of the Falls');
+  coins([[-4550,6780,-12620],mid(gale[4]),mid(gale[5])],'Gale Ridge');
+  pickup('shard','shard-vane',-2750,6615,cape+1410,{hint:'Gale Ridge: the Weathervane, across the windy gulf. Jump out from the very edge; long jump home.'});
+
+  // ---- 9. The Cornice and the Summit ------------------------------------------
+  // Up the Horn's west ridge: rock steps, then a snow cornice to hang from over
+  // the bare, slippery crest, the summit ledge, a chimney between two rock
+  // towers, and a rock ramp to the summit snowfield.
+  const crest=[1,2,3,4].map(k=>horn[k][8]);
+  // The crest's [height, z] at x.
+  const ridge=x=>{const k=crest.findIndex(p=>p[0]>x),i=k<0?crest.length-2:Math.max(0,k-1),p=crest[i],q=crest[i+1],t=(x-p[0])/(q[0]-p[0]);
+    return [p[1]+(q[1]-p[1])*t,p[2]+(q[2]-p[2])*t];};
+  // A block astride the crest from x0 to x1, `half` wide each side, buried below.
+  const astride=(x0,x1,half,tops,colors,type=0,options={})=>{
+    const o=[[x0,ridge(x0)[1]-half],[x1,ridge(x1)[1]-half],[x1,ridge(x1)[1]+half],[x0,ridge(x0)[1]+half]];
+    slab(o,options.base??o.map(([x,z])=>hornAt(x,z)-400),tops,colors,type,{lip:30,...options});
+  };
+  const steps=[[-5750,-5480],[-5480,-5210],[-5210,-4940],[-4940,-4650]].map(([x0,x1],i,all)=>{
+    const top=R(ridge(x1)[0]+60);astride(x0,x1,180,top,PALETTE.rock,NOT_SLIPPERY,{skip:i<all.length-1?[1]:[]});
+    return [R((x0+x1)/2),top,R(ridge((x0+x1)/2)[1])];
+  });
+  // The cornice: slick on top, but its underside can be hung from all the way up.
+  {
+    const under=x=>R(ridge(x)[0]+360),o=[-4750,-3750];
+    astride(...o,250,[o[0],o[1],o[1],o[0]].map(x=>under(x)+220),PALETTE.drift,VERY_SLIPPERY,
+      {base:[o[0],o[1],o[1],o[0]].map(under),bottom:true,bottomType:HANGABLE,lip:0});
+  }
+  // The summit ledge (a checkpoint) and the two rock towers of the chimney.
+  astride(-3800,-3300,400,8500,PALETTE.rock,0);
+  for(const side of [-1,1])slab([[-3550,ridge(-3550)[1]+side*230],[-3250,ridge(-3250)[1]+side*230],[-3250,ridge(-3250)[1]+side*510],
+    [-3550,ridge(-3550)[1]+side*510]],8500,9400,PALETTE.rock,0,{lip:40});
+  // A rock ramp from the south tower's top to the summit snowfield.
+  {
+    const w=ridge(-3250)[1]+370,o=[[-3250,w-140],[-1000,ridge(-1000)[1]-150],[-1000,ridge(-1000)[1]+150],[-3250,w+140]];
+    slab(o,o.map(([x,z])=>hornAt(x,z)-400),[9400,TOP,TOP,9400],PALETTE.rock,NOT_SLIPPERY,{lip:30});
+  }
+  // The summit: a cairn for the Aurora Star, and the Horn's Tip, an ice needle
+  // beside a tall tor: wall-kick between them to reach it.
+  column(-300,-14350,180,TOP-200,TOP+260,PALETTE.dark,6,10);
+  pickup('star','aurora-star',-300,TOP+400,-14350);
+  box(-600,-240,-15030,-14670,TOP-300,11050,PALETTE.rock,0,{lip:40});
+  column(300,-14850,130,TOP-600,11200,PALETTE.serac,6,30,0,{lip:40});
+  pickup('shard','shard-tip',300,11290,-14850,{hint:'The summit: the Horn\'s Tip. Wall-kick up between the needle and the tor.'});
+  coins([steps[1],steps[3]].map(([x,y,z])=>[x,y+80,z]),'Gale Ridge');
+  // One coin along the cornice, where only a hanging explorer passes.
+  coins([[-4200,R(ridge(-4200)[0]+266),R(ridge(-4200)[1])]],'Gale Ridge');
+  coins([[-3400,9000,R(ridge(-3400)[1])],[-2125,9830,R(ridge(-2125)[1]+185)],[-650,TOP+80,-14350]],'Summit Ledge');
+
+  // ---- 10. The Avalanche Run -----------------------------------------------------
+  // The long way home: an ice luge from the summit's east edge, round the Horn
+  // and south past the glacier on a raised track, to the snow of Frostmere Camp,
+  // which stops the slide. Walls line both sides (at ~100 a tick a slide bounces
+  // off them); twice the track breaks at a lip that you jump from the slide.
+  // Each run is a centre line of [x,y,z] points; the deck is mitred at bends.
+  function luge(points,{half=300,rail=60,high=160,deck=260,walls=true}={}) {
+    const dir=(a,c)=>{const l=Math.hypot(c[0]-a[0],c[2]-a[2]);return [(c[0]-a[0])/l,(c[2]-a[2])/l];};
+    const at=points.map((p,i)=>{
+      const a=dir(points[Math.max(0,i-1)],points[Math.max(1,i)]),c=dir(points[Math.min(points.length-2,i)],points[Math.min(points.length-1,i+1)]);
+      const m=[a[0]+c[0],a[1]+c[1]],l=Math.hypot(...m),k=1/Math.max(.5,(m[0]*c[0]+m[1]*c[1])/l);
+      const n=[m[1]/l*k,-m[0]/l*k],side=(w,y)=>[[p[0]+n[0]*w,y,p[2]+n[1]*w],[p[0]-n[0]*w,y,p[2]-n[1]*w]],w=walls?half+rail:half;
+      return {track:side(half,p[1]),lip:side(half,p[1]+high),top:side(w,p[1]+high),edge:side(w,p[1]),foot:side(w,p[1]-deck)};
+    });
+    const quad=(a,c,d,e,color,type,normal,style)=>{b.face([a,c,d],color,type,normal,style);b.face([a,d,e],color,type,normal,style);};
+    for(let i=0;i<at.length-1;i++) {
+      const p=at[i],q=at[i+1],left=[q.track[0][0]-q.track[1][0],0,q.track[0][2]-q.track[1][2]];
+      quad(p.track[0],p.track[1],q.track[1],q.track[0],PALETTE.luge.top,VERY_SLIPPERY,[0,1,0],'ice');
+      quad(p.foot[0],p.foot[1],q.foot[1],q.foot[0],PALETTE.luge.side,0,[0,-1,0],'ice');
+      for(const s of [0,1]) {
+        const out=s?left.map(v=>-v):left;
+        if(walls) {
+          quad(p.track[s],q.track[s],q.lip[s],p.lip[s],PALETTE.luge.side,0,out.map(v=>-v),'ice');
+          quad(p.lip[s],q.lip[s],q.top[s],p.top[s],PALETTE.luge.rim,0,[0,1,0],'snow');
+        }
+        quad(p.top[s],q.top[s],q.foot[s],p.foot[s],PALETTE.luge.side,0,out,'ice');
+      }
+    }
+    // Close the ends below the deck (and the walls' ends): the track itself stays open.
+    for(const [e,f] of [[at[0],dir(points[1],points[0])],[at.at(-1),dir(points.at(-2),points.at(-1))]]) {
+      const n=[f[0],0,f[1]];
+      b.face([e.track[0],e.track[1],e.foot[1],e.foot[0]],PALETTE.luge.side,0,n,'ice');
+      if(walls)for(const s of [0,1])b.face([e.track[s],e.lip[s],e.top[s],e.edge[s]],PALETTE.luge.side,0,n,'ice');
+    }
+    return points;
+  }
+  const avalanche=[
+    // Off the summit's east edge and down past the Horn's east peak...
+    luge([[300,TOP,-14350],[1000,9800,-14250],[3500,8900,-13800],[6500,7600,-11800],[7600,6800,-9500],[7700,6000,-7300]],{half:250}),
+    // ...over the first lip, and south past the icefall and the glacier...
+    luge([[7750,5500,-5300],[7800,4000,-500],[7700,2600,3300]],{half:250}),
+    // ...over the second lip, round over the lake and into camp.
+    luge([[7550,2200,5200],[7200,1500,7400],[6000,900,9400],[4600,620,10600],[3500,540,10950],[2650,500,11000]],{half:250}),
+  ];
+  // Coins on the racing line (a slide swings wide after each bend), and one
+  // over each lip for a good jump.
+  coins([[1840,9540,-14010],[5100,8300,-12940],[7195,7265,-10785],[7840,6530,-8650],[7715,5015,-3575],[7755,3205,1800],
+    [6735,1245,8500],[4070,630,10975]],'Summit Ledge');
+  coins([[7780,6400,-6650],[7670,3030,3850]],'Summit Ledge',{arc:true});
+
+  // ---- 11. The Polar Star -------------------------------------------------------
+  // Find every Frost Shard and the Polar Star shines atop an ice spire on the
+  // Mirror Isle: a double jump and a grab reach the top; a single jump cannot.
+  column(1500,5700,170,-150,770,PALETTE.serac,7,0,0,{lip:40});
+  pickup('bonus','polar-star',1500,900,5700);
+  coins(arc(1500,850,5700,90,3,30),'Frostmere Camp');
+
 
   for(const c of checkpoints)pickup('checkpoint',`checkpoint-${c.id}`,...c.position);
   const {triangles,shapes}=b.finish();
-  return {kind:'hoarfrost',name:'Hoarfrost Heights',triangles,shapes,pickups,checkpoints,sections,zones:checkpoints,logs,spills,route,
-    // The clock stops at this star. PART 2: change it to 'aurora-star' (the summit).
-    goal:'icefall-star',
-    // PART 2 areas, drawn dashed by tools/level_map.mjs. Keep new geometry inside them.
-    reserved:[
-      {name:'Part 2: upper Horn',outline:[[7800,-11700],[5000,-10420],[-800,-10700],[-6800,-12000],[-8600,-15900],[-3800,-19700],[6000,-18100]]},
-      {name:'Part 2: west trail',outline:[[-2000,-10200],[2900,-10200],[2900,-8200],[-2000,-8200]]},
-    ],
+  // The main route onward from the Shoulder: the falls, Gale Ridge, the west
+  // ridge to the summit, and the Avalanche Run home.
+  const climb=[[3075,4300,face(3075)+130],[2125,4300,-10227],[1050,4300,-10050],[1050,5100,-9700],[375,5300,-10100],[-1150,5300,-10100],
+    [-1200,6400,-11350],...gale.flat(),...steps,[-3700,8500,R(ridge(-3700)[1])],[-3400,9400,R(ridge(-3400)[1]+370)],[-1000,TOP,R(ridge(-1000)[1])],
+    [-300,TOP,-14600],...avalanche.flat()];
+  return {kind:'hoarfrost',name:'Hoarfrost Heights',triangles,shapes,pickups,checkpoints,sections,zones:checkpoints,logs,spills,route:[...route,...climb],
+    gale,steps,avalanche,horn:hornAt,
+    // Where the scene dresses the upper Horn: the Weathervane's tower top,
+    // the promontory's root on the path, the cornice's ends.
+    vane:[-2750,6525,cape+1410],cape:[-2750,6525,cape],cornice:[-4750,-3750].map(x=>[x,R(ridge(x)[0]+360),R(ridge(x)[1])]),
+    // The clock stops at the summit's star.
+    goal:'aurora-star',
     intro:{from:[3600,5200,15600],look:[-800,3800,-4000]},
     text,
     theme:{background:'#1a2244',fog:['#9fb0cf',8000,38000],far:44000,exposure:1.08,
@@ -312,23 +502,34 @@ export function createHoarfrost() {
       edges:['#ffffff',.2],dust:'#f3f7ff',shadow:'#27324f',
       // Frostbite water splashes and steams instead of burning.
       hazard:{burst:['#f4fcff','#62b9e6'],cloud:['#e8f4ff','#a8c6dc'],fire:['#e6f8ff','#79c7ef'],smoke:['#eef6ff','#b8cfe0']},
-      shard:['#8fe3ff','#1f86c9','#c4f2ff'],stars:{star:['#ffe07a','#ffb300'],bonus:['#b9a8ff','#6a4ddf']}}};
+      shard:['#8fe3ff','#1f86c9','#c4f2ff'],stars:{star:['#ffe07a','#ffb300'],bonus:['#b9a8ff','#6a4ddf']},
+      // Snow underfoot crunches and ice rings (the core reports its default
+      // terrain); frostbite water splashes and fizzes instead of burning.
+      audio:{terrain:[5,6,2,3,4,5,6,7],hazard:'frost'}}};
 }
 
-// Player-facing copy, read by main.js. PART 2 extends the objectives (the
-// Aurora Star at the summit and the Polar Star) and the victory lines.
+// Player-facing copy, read by main.js.
 const text={
-  start:'Climb to the Shoulder, halfway up the Horn. Cross Mirror Lake first.',
+  start:'Climb the Hoarfrost Horn to the Aurora Star. Cross Mirror Lake first.',
   shard:'Frost Shard',shards:'Frost Shards',
+  reveal:'Every Frost Shard found! The Polar Star shines over the Mirror Isle.',
   objectives:[
     {icon:'★',title:'Icefall Star',note:'Cross the lake, the forest and the glacier, then scale the Icefall.',star:'icefall-star'},
-    {icon:'♦',title:'Frost Shards',note:'Five hide behind optional challenges.',shards:true},
-    {icon:'★',title:'The summit',note:'The upper Horn is snowed in for now.',locked:true},
+    {icon:'★',title:'Aurora Star',note:'Climb the Frozen Falls and Gale Ridge to the summit of the Horn.',star:'aurora-star'},
+    {icon:'♦',title:'Frost Shards',note:'Eight hide behind optional challenges.',shards:true},
+    {icon:'★',title:'Polar Star',note:'Find every shard, then visit the Mirror Isle.',star:'polar-star',needsShards:true},
   ],
-  victory(kind,{shards,best}) {
-    const left=shards.total-shards.found;
-    return {title:'Icefall Star claimed.',
-      copy:left?`The Shoulder is yours${best?` · best ${best}`:''}. ${left} Frost Shard${left===1?'':'s'} still hide${left===1?'s':''} in the valley.`
-        :'The Shoulder is yours, and every Frost Shard with it. The upper Horn is snowed in for now.'};
+  victory(kind,{session,shards,best,pickup}) {
+    const left=shards.total-shards.found,has=id=>session.found.has(id);
+    const hiding=`${left} Frost Shard${left===1?' still hides':'s still hide'} on the mountain.`;
+    if(pickup.id==='icefall-star')return {title:'Icefall Star claimed.',
+      copy:has('aurora-star')?`The Shoulder is yours.${left?` ${hiding}`:''}`
+        :'The Shoulder is yours. Follow the ledges west to the Frozen Falls: the Aurora Star waits at the summit.'};
+    if(pickup.id==='aurora-star')return {title:'Aurora Star claimed.',
+      copy:`The summit of the Horn is yours${best?` · best ${best}`:''}. ${left?hiding:has('polar-star')?'Every star on the Horn is yours!'
+        :'Every Frost Shard is yours: the Polar Star shines over the Mirror Isle.'} Ride the Avalanche Run home from the summit's east edge.`};
+    return {title:'Polar Star claimed.',
+      copy:has('aurora-star')?'Every star on the Horn is yours. Hoarfrost Heights is conquered!'
+        :'Every Frost Shard, and the Polar Star with them. The Aurora Star still waits at the summit.'};
   },
 };

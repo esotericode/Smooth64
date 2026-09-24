@@ -1,7 +1,7 @@
 // Route-proof kit: drive the real movement core with controller plans and
 // report whether a target was reached. Adapted from tests/caldera.test.mjs
-// (which keeps its own copy); Hoarfrost Heights' tests use this module, and
-// part 2 of that level should too. Timing searches stop at the first success.
+// (which keeps its own copy); Hoarfrost Heights' tests use this module. Timing
+// searches stop at the first success; a `lost` test ends a failed attempt early.
 import {readFileSync} from 'node:fs';
 import {loadCore} from '../web/engine.js';
 import {bodyCenter} from '../web/level.js';
@@ -19,7 +19,7 @@ export async function routeKit(world) {
   const core=await loadCore(bytes);core.loadWorld(world.triangles);
   // Push the stick toward world yaw `dir` (radians, 0 = +Z) with the camera behind.
   // A plan returns {dir, mag, buttons}; dir null means a neutral stick.
-  function run(start,face,plan,done,ticks,{lava=true}={}) {
+  function run(start,face,plan,done,ticks,{lava=true,lost=null}={}) {
     core.reset(start,coreYaw(face));const memory={};let s=core.state();
     for(let i=0;i<ticks;i++) {
       const {dir=face,mag=80,buttons=0}=plan(s,names[s.action],i,memory)||{};
@@ -28,6 +28,7 @@ export async function routeKit(world) {
       if(lava&&name.includes('LAVA'))return false;
       if(s.position[1]<-1500)return false;
       if(done(s,name))return true;
+      if(lost?.(s,name,i))return false;
     }
     return false;
   }

@@ -11,6 +11,11 @@
 
 // A palette entry: walkable top and side colors, and the style of each.
 export const paint=(top,side,topStyle='snow',sideStyle=topStyle)=>({top,side,topStyle,sideStyle});
+// Height of the highest of these triangles over [x,z], or -Infinity where none is.
+export const surface=tris=>(x,z)=>tris.reduce((top,[a,b,c])=>{
+  const d=(b[0]-a[0])*(c[2]-a[2])-(c[0]-a[0])*(b[2]-a[2]);if(!d)return top;
+  const u=((x-a[0])*(c[2]-a[2])-(c[0]-a[0])*(z-a[2]))/d,v=((b[0]-a[0])*(z-a[2])-(x-a[0])*(b[2]-a[2]))/d;
+  return u<0||v<0||u+v>1?top:Math.max(top,a[1]+u*(b[1]-a[1])+v*(c[1]-a[1]));},-Infinity);
 
 export function createBuilder({seed=11}={}) {
   const buckets=new Map(),R=Math.round;
@@ -64,18 +69,23 @@ export function createBuilder({seed=11}={}) {
     }
   }
   // A faceted mountain: convex rings [[x,y,z],...] of equal length, bottom to
-  // top, closed by an apex. Its flanks are steep floors: the surface type
-  // decides whether they can be climbed (VERY_SLIPPERY: never).
-  function mountain(rings,apex,colors,type=0) {
-    const n=rings[0].length,c=rings[0].reduce((s,p)=>[s[0]+p[0]/n,s[1]+p[2]/n],[0,0]);
+  // top, closed by an apex. A `cap` ({colors,type}) paints the apex's faces,
+  // e.g. a flat summit when the apex is level with the top ring. Its flanks
+  // are steep floors: the surface type decides whether they can be climbed
+  // (VERY_SLIPPERY: never). Returns its surface height at [x,z], for fitting
+  // ledges flush against it.
+  function mountain(rings,apex,colors,type=0,cap={colors,type}) {
+    const n=rings[0].length,c=rings[0].reduce((s,p)=>[s[0]+p[0]/n,s[1]+p[2]/n],[0,0]),tris=[];
     const out=(...ps)=>{const m=ps.reduce((s,p)=>[s[0]+p[0]/ps.length,s[1]+p[2]/ps.length],[0,0]);return [m[0]-c[0],Math.hypot(m[0]-c[0],m[1]-c[1])*.5,m[1]-c[1]];};
+    const add=(ps,...rest)=>{tris.push(ps);face(ps,...rest);};
     for(let k=0;k<rings.length;k++)for(let i=0;i<n;i++) {
       const p=rings[k][i],q=rings[k][(i+1)%n];
-      if(k===rings.length-1){face([p,q,apex],colors.top,type,out(p,q),colors.topStyle);continue;}
+      if(k===rings.length-1){add([p,q,apex],cap.colors.top,cap.type,out(p,q),cap.colors.topStyle);continue;}
       const u=rings[k+1][i],v=rings[k+1][(i+1)%n];
-      face([p,q,v],k?colors.top:colors.side,type,out(p,q,v),k?colors.topStyle:colors.sideStyle);
-      face([p,v,u],k?colors.top:colors.side,type,out(p,v,u),k?colors.topStyle:colors.sideStyle);
+      add([p,q,v],k?colors.top:colors.side,type,out(p,q,v),k?colors.topStyle:colors.sideStyle);
+      add([p,v,u],k?colors.top:colors.side,type,out(p,v,u),k?colors.topStyle:colors.sideStyle);
     }
+    return surface(tris);
   }
   const polar=(cx,cz,r,deg)=>[cx+r*Math.cos(deg*Math.PI/180),cz-r*Math.sin(deg*Math.PI/180)];
   const ring=(cx,cz,r,n,rot=0)=>Array.from({length:n},(_,i)=>polar(cx,cz,r,rot+i*360/n));

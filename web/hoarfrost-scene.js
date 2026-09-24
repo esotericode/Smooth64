@@ -1,6 +1,6 @@
 import * as T from './vendor/three.module.min.js';
 import {groundText} from './decor.js';
-import {CLOUD} from './hoarfrost.js';
+import {CLOUD,TOP} from './hoarfrost.js';
 
 // Render-only dressing for Hoarfrost Heights. Nothing here collides: every
 // surface the explorer can touch is a triangle in hoarfrost.js. Props stand at
@@ -50,6 +50,19 @@ void main(){float rays=noise(vec2(vUv.x*40.0+seed,time*.25))*.6+noise(vec2(vUv.x
 float hem=smoothstep(0.0,.08,vUv.y)*pow(1.0-vUv.y,1.6);float ends=smoothstep(0.0,.12,vUv.x)*smoothstep(1.0,.88,vUv.x);
 vec3 color=mix(vec3(.25,1.0,.62),vec3(.55,.35,1.0),smoothstep(.25,.9,vUv.y));
 gl_FragColor=vec4(color*(.35+rays),hem*ends*(.25+.55*rays)*.55);
+}`;
+
+// The frozen falls: still streaks of ice, with a slow glint running down them.
+const CURTAIN_FRAGMENT=`uniform float time;varying vec2 vUv;
+#include <fog_pars_fragment>
+${NOISE}
+void main(){vec2 p=vec2(vUv.x*38.0,vUv.y*3.0);float n=noise(p)*.65+noise(p*vec2(2.1,1.3))*.35;
+float glint=smoothstep(.9,1.0,sin(vUv.y*9.0+time*.6+n*5.0)*.5+.5)*smoothstep(.55,.8,n);
+vec3 color=mix(vec3(.55,.78,.92),vec3(.94,.99,1.0),smoothstep(.35,.85,n))+vec3(.35)*glint;
+gl_FragColor=vec4(color,.42+.3*n);
+#include <tonemapping_fragment>
+#include <colorspace_fragment>
+#include <fog_fragment>
 }`;
 
 function softDot() {
@@ -183,9 +196,10 @@ export function decorateHoarfrost(group,world,renderer) {
   {
     const post=new T.MeshStandardMaterial({color:'#4b3a2c',roughness:.9});
     const lamp=new T.MeshBasicMaterial({color:'#ffc47a',transparent:true,opacity:.9,blending:T.AdditiveBlending,depthWrite:false});
-    for(const [x,y,z] of [[-2200,500,10800],[-900,500,10300],[2400,500,10900],[-5300,100,4300],[-7800,100,5600],
+    for(const [x,y,z] of [[-2200,500,10800],[-900,500,10300],[2300,500,10600],[-5300,100,4300],[-7800,100,5600],
       [-5400,450,3250],[-5300,850,2000],[-7650,1000,-560],[-7050,1000,-560],[-5200,1400,-2000],[-3850,1800,-3600],[-3850,1800,-1600],
-      [3600,2300,-5550],[5800,2300,-5550],[3700,4300,-9300],[6200,4300,-9300]]) {
+      [3600,2300,-5550],[5800,2300,-5550],[3700,4300,-9300],[6200,4300,-9300],
+      [1480,6400,-10320],[-940,6400,-10000],[-4414,6700,-12387],[-5222,6700,-12646],[-3780,8500,-14771],[-3780,8500,-14071]]) {
       const stand=new T.Mesh(new T.CylinderGeometry(10,14,170,6),post);stand.position.set(x,y+85,z);stand.castShadow=true;group.add(stand);
       const glow=new T.Mesh(new T.BoxGeometry(38,46,38),lamp);glow.position.set(x,y+190,z);group.add(glow);flames.push(glow);
     }
@@ -196,8 +210,8 @@ export function decorateHoarfrost(group,world,renderer) {
     const stand=new T.Mesh(new T.CylinderGeometry(12,14,300,6),pole);stand.position.set(-1250,650,10480);group.add(stand);
     board(group,'MIRROR LAKE  ↖',-1250,740,10470,.25,300);board(group,'THE HORN  ↑',-1250,660,10470,.25,300);
     // Prayer flags from the watchtower to a pole on the cliff edge.
-    const flagPole=new T.Mesh(new T.CylinderGeometry(10,12,700,6),pole);flagPole.position.set(2550,850,10850);group.add(flagPole);
-    const from=new T.Vector3(2300,1380,11500),to=new T.Vector3(2550,1190,10850),colors=['#d8413a','#f2c14e','#3f8f5a','#3d6fd1','#f4f1ea'];
+    const flagPole=new T.Mesh(new T.CylinderGeometry(10,12,700,6),pole);flagPole.position.set(2690,850,11750);group.add(flagPole);
+    const from=new T.Vector3(2300,1380,11500),to=new T.Vector3(2690,1190,11750),colors=['#d8413a','#f2c14e','#3f8f5a','#3d6fd1','#f4f1ea'];
     for(let i=1;i<14;i++) {
       const t=i/14,p=from.clone().lerp(to,t);p.y-=Math.sin(t*Math.PI)*110;
       const flag=new T.Mesh(new T.PlaneGeometry(46,56),new T.MeshStandardMaterial({color:colors[i%5],roughness:.8,side:T.DoubleSide}));
@@ -219,12 +233,12 @@ export function decorateHoarfrost(group,world,renderer) {
       mist.position.set(x+out[0]*side*160,-760,z+out[1]*side*160);mist.scale.setScalar(width*1.6);group.add(mist);
     });
     updates.push(time=>{for(const m of falls)m.uniforms.time.value=time;});
-    // A star outline on the Mirror Isle. PART 2: the Polar Star appears here.
+    // A star outline on the ice spire of the Mirror Isle, where the Polar Star appears.
     const outline=[];
-    for(let i=0;i<=10;i++){const r=i%2?70:170,a=i/10*Math.PI*2;outline.push(new T.Vector3(1500+Math.sin(a)*r,254,5700+Math.cos(a)*r));}
+    for(let i=0;i<=10;i++){const r=i%2?60:150,a=i/10*Math.PI*2;outline.push(new T.Vector3(1500+Math.sin(a)*r,774,5700+Math.cos(a)*r));}
     group.add(new T.Line(new T.BufferGeometry().setFromPoints(outline),new T.LineBasicMaterial({color:'#7fb4ff',transparent:true,opacity:.7})));
   }
-  // ---- The Shoulder: the hut's windows and smoke, and the snowed-in trail. ----
+  // ---- The Shoulder: the hut's windows and smoke, and the sign for the trail west. ----
   {
     const glowPane=new T.MeshBasicMaterial({color:'#ffc27a',transparent:true,opacity:.85,blending:T.AdditiveBlending,depthWrite:false,side:T.DoubleSide});
     for(const x of [5650,5950]){const pane=new T.Mesh(new T.PlaneGeometry(90,110),glowPane);pane.position.set(x,4480,-9199);group.add(pane);}
@@ -236,8 +250,8 @@ export function decorateHoarfrost(group,world,renderer) {
     updates.push(time=>smoke.children.forEach(s=>{const k=(time*.18+s.userData.phase)%1;
       s.position.set(6000+k*160,4830+k*700,-9350-k*60);s.scale.setScalar(80+k*420);s.material.opacity=.4*(1-k);}));
     const post=new T.Mesh(new T.CylinderGeometry(12,14,260,6),new T.MeshStandardMaterial({color:'#5c4633',roughness:.9}));
-    post.position.set(3650,4430,-9650);group.add(post);
-    board(group,'TRAIL SNOWED IN',3650,4520,-9640,Math.PI/2,330);
+    post.position.set(3600,4430,-10090);group.add(post);
+    board(group,'FROZEN FALLS  ←',3612,4520,-10090,Math.PI/2,330);
   }
   // The fallen pine over the ravine: bark over the slick collision beams.
   {
@@ -259,15 +273,127 @@ export function decorateHoarfrost(group,world,renderer) {
       glaze.rotation.set(-Math.atan2(axis.y,Math.hypot(axis.x,axis.z)),Math.atan2(axis.x,axis.z),0,'YXZ');group.add(glaze);
     }
   }
-  // Icicles under the ledges you climb past: cones pointing down.
+  // Icicles under the ledges you climb past, the Frozen Falls' overhang and the
+  // cornice's edges: cones pointing down, just outside each face.
   {
     const ice=new T.MeshStandardMaterial({color:'#cfefff',roughness:.2,metalness:.1,transparent:true,opacity:.85});
-    for(const [x0,x1,y,z] of [[3620,4260,3650,-6300],[4720,5680,3650,-6300],[3620,4780,4350,-8200],[-2560,-2320,1150,-2450]]) {
+    const fringe=([x0,y0,z0],[x1,y1,z1],most=140)=>{
       for(let x=x0;x<x1;x+=70+random()*50) {
-        const length=60+random()*140,cone=new T.Mesh(new T.ConeGeometry(12+random()*8,length,5),ice);
-        cone.rotation.x=Math.PI;cone.position.set(x,y-length/2,z+2);group.add(cone);
+        const t=(x-x0)/(x1-x0),length=60+random()*most,cone=new T.Mesh(new T.ConeGeometry(12+random()*8,length,5),ice);
+        cone.rotation.x=Math.PI;cone.position.set(x,y0+(y1-y0)*t-length/2,z0+(z1-z0)*t);group.add(cone);
+      }
+    };
+    for(const [x0,x1,y,z,most] of [[3620,4260,3650,-6300],[4720,5680,3650,-6300],[3620,4780,4350,-8200],[-2560,-2320,1150,-2450],
+      [-1000,350,5600,-9950,70],[350,1550,6400,-10250]])fringe([x0,y,z+2],[x1,y,z+2],most);
+    const [a,c]=world.cornice;
+    for(const side of [-1,1])fringe([a[0],a[1],a[2]+side*252],[c[0],c[1],c[2]+side*252],90);
+  }
+  // ---- The Frozen Falls: a glint runs slowly down the frozen curtain. ----
+  {
+    const material=new T.ShaderMaterial({vertexShader:SHEET_VERTEX,fragmentShader:CURTAIN_FRAGMENT,transparent:true,depthWrite:false,fog:true,
+      uniforms:T.UniformsUtils.merge([T.UniformsLib.fog,{time:{value:0}}])});
+    // Just proud of the ice face, under the overhang and beside it; the streaks
+    // are scaled to the world, so the two sheets meet seamlessly.
+    for(const [x0,x1,y1] of [[-1000,350,5600],[350,1550,6400]]) {
+      const geometry=new T.PlaneGeometry(x1-x0,y1-CLOUD+100),uv=geometry.attributes.uv,position=geometry.attributes.position;
+      geometry.translate((x0+x1)/2,(y1+CLOUD-100)/2,-10247);
+      for(let i=0;i<uv.count;i++)uv.setXY(i,position.getX(i)/1200,position.getY(i)/2400);
+      group.add(new T.Mesh(geometry,material));
+    }
+    updates.push(time=>{material.uniforms.time.value=time;});
+  }
+  // ---- Gale Ridge: blown snow racing south, the Weathervane, and prayer flags
+  // strung out to it across the gulf, all streaming with the gale. ----
+  {
+    const count=160,streaks=new T.InstancedMesh(new T.BoxGeometry(5,5,1),
+      new T.MeshBasicMaterial({color:'#ffffff',transparent:true,opacity:.4,depthWrite:false}),count);
+    streaks.frustumCulled=false;group.add(streaks);
+    const gusts=Array.from({length:count},()=>[-5900+random()*4700,6300+random()*1100,random()*4600,160+random()*260,900+random()*700,random()*6]);
+    const m=new T.Matrix4(),q=new T.Quaternion(),s=new T.Vector3(),p=new T.Vector3();
+    updates.push(time=>{
+      gusts.forEach(([x,y,z,length,speed,phase],i)=>
+        streaks.setMatrixAt(i,m.compose(p.set(x,y+Math.sin(time*1.7+phase)*40,-14500+(z+time*speed)%4600),q,s.set(1,1,length))));
+      streaks.instanceMatrix.needsUpdate=true;
+    });
+  }
+  {
+    const [x,y,z]=world.vane,[cx,cy,cz]=world.cape,iron=new T.MeshStandardMaterial({color:'#3b3f4a',roughness:.5,metalness:.6});
+    const gold=new T.MeshStandardMaterial({color:'#e8bf55',roughness:.45,metalness:.25,side:T.DoubleSide});
+    // The Weathervane stands at the tower's far edge, clear of the landing.
+    const post=new T.Mesh(new T.CylinderGeometry(9,12,420,6),iron);post.position.set(x,y+210,z+250);post.castShadow=true;group.add(post);
+    for(const yaw of [0,Math.PI/2]){const arm=new T.Mesh(new T.BoxGeometry(170,7,7),iron);arm.position.set(x,y+330,z+250);arm.rotation.y=yaw;group.add(arm);}
+    const vane=new T.Group();vane.position.set(x,y+420,z+250);group.add(vane);
+    const shaft=new T.Mesh(new T.BoxGeometry(8,8,240),gold),head=new T.Mesh(new T.ConeGeometry(24,70,4),gold),tail=new T.Mesh(new T.PlaneGeometry(80,70),gold);
+    head.rotation.x=-Math.PI/2;head.position.z=-150;tail.rotation.y=Math.PI/2;tail.position.z=110;vane.add(shaft,head,tail);
+    // The gale blows from the north, so the arrow points into it, swinging with the gusts.
+    updates.push(time=>{vane.rotation.y=.25*Math.sin(time*1.3)*Math.sin(time*.47+1);});
+    // Prayer flags from the promontory's corner to the Weathervane's post.
+    const pole=new T.Mesh(new T.CylinderGeometry(9,11,440,6),new T.MeshStandardMaterial({color:'#5c4633',roughness:.9}));
+    pole.position.set(cx+180,cy+220,cz+460);group.add(pole);
+    const from=new T.Vector3(cx+180,cy+430,cz+460),to=new T.Vector3(x,y+400,z+250),colors=['#d8413a','#f2c14e','#3f8f5a','#3d6fd1','#f4f1ea'];
+    const yaw=Math.atan2(to.x-from.x,to.z-from.z)-Math.PI/2,sag=t=>from.clone().lerp(to,t).add(new T.Vector3(0,-Math.sin(t*Math.PI)*120,0));
+    group.add(new T.Line(new T.BufferGeometry().setFromPoints(Array.from({length:17},(_,i)=>sag(i/16))),new T.LineBasicMaterial({color:'#d9d4c7'})));
+    for(let i=1;i<16;i++) {
+      const geometry=new T.PlaneGeometry(46,56);geometry.translate(0,-28,0);
+      const flag=new T.Mesh(geometry,new T.MeshStandardMaterial({color:colors[i%5],roughness:.8,side:T.DoubleSide}));
+      flag.position.copy(sag(i/16));flag.rotation.y=yaw;group.add(flag);
+      updates.push(time=>{flag.rotation.z=.65+.25*Math.sin(time*5.1+i*1.3)*Math.sin(time*1.3);});
+    }
+  }
+  // ---- The summit: a flag on the Aurora Star's cairn, streaming south. ----
+  {
+    const pole=new T.Mesh(new T.CylinderGeometry(9,11,460,6),new T.MeshStandardMaterial({color:'#5c4633',roughness:.9}));
+    pole.position.set(-150,TOP+490,-14350);group.add(pole);
+    const c=document.createElement('canvas');c.width=256;c.height=160;
+    const g=c.getContext('2d');g.fillStyle='#2f4fa8';g.fillRect(0,0,256,160);g.fillStyle='#ffd65a';g.beginPath();
+    for(let i=0;i<10;i++){const r=i%2?22:56,a=i*Math.PI/5;g.lineTo(128+Math.sin(a)*r,82-Math.cos(a)*r);}
+    g.fill();
+    const texture=new T.CanvasTexture(c);texture.colorSpace=T.SRGBColorSpace;
+    const geometry=new T.PlaneGeometry(200,125,10,1);geometry.translate(100,0,0);
+    const flag=new T.Mesh(geometry,new T.MeshStandardMaterial({map:texture,roughness:.8,side:T.DoubleSide}));
+    flag.position.set(-150,TOP+650,-14350);flag.rotation.y=-Math.PI/2;group.add(flag);
+    const position=geometry.attributes.position,rest=Float32Array.from(position.array);
+    updates.push(time=>{for(let i=0;i<position.count;i++){const u=rest[i*3];position.setZ(i,Math.sin(u*.035-time*6)*u*.12);}position.needsUpdate=true;});
+  }
+  // ---- The Avalanche Run: pillars down to the ground or the clouds, a banner
+  // at the start, and a warning painted before each lip. ----
+  {
+    // The highest floor under [x,z] below `limit` (or just under the clouds).
+    const ground=(x,z,limit)=>world.triangles.reduce((top,{vertices:[a,b,c]})=>{
+      const ny=(b[2]-a[2])*(c[0]-b[0])-(b[0]-a[0])*(c[2]-b[2]),d=(b[0]-a[0])*(c[2]-a[2])-(c[0]-a[0])*(b[2]-a[2]);
+      if(ny<=0||!d)return top;
+      const u=((x-a[0])*(c[2]-a[2])-(c[0]-a[0])*(z-a[2]))/d,v=((b[0]-a[0])*(z-a[2])-(x-a[0])*(b[2]-a[2]))/d,y=a[1]+u*(b[1]-a[1])+v*(c[1]-a[1]);
+      return u<0||v<0||u+v>1||y>=limit?top:Math.max(top,y);},CLOUD-300);
+    const pier=new T.MeshStandardMaterial({color:'#7f98b3',roughness:.7,flatShading:true});
+    for(const run of world.avalanche)for(let i=0;i<run.length-1;i++) {
+      const p=run[i],q=run[i+1],n=Math.ceil(Math.hypot(q[0]-p[0],q[2]-p[2])/1300);
+      for(let k=0;k<n;k++) {
+        const t=(k+.5)/n,x=p[0]+(q[0]-p[0])*t,y=p[1]+(q[1]-p[1])*t-260,z=p[2]+(q[2]-p[2])*t;
+        if(world.horn(x,z)>y-60)continue; // the track runs on the Horn itself here
+        const floor=ground(x,z,y-1),height=y-floor,r=45+height/90;
+        const pillar=new T.Mesh(new T.CylinderGeometry(r,r*1.25,height,6),pier);pillar.position.set(x,floor+height/2,z);group.add(pillar);
       }
     }
+    const stripe=[new T.MeshStandardMaterial({color:'#d8413a',roughness:.7}),new T.MeshStandardMaterial({color:'#f4f1ea',roughness:.7})];
+    world.avalanche.slice(0,-1).forEach(run=>{
+      const q=run.at(-1),p=run.at(-2),f=new T.Vector3(q[0]-p[0],q[1]-p[1],q[2]-p[2]).normalize();
+      const right=f.clone().cross(new T.Vector3(0,1,0)).normalize(),up=right.clone().cross(f),end=new T.Vector3(...q);
+      const paint=groundText(group,'JUMP!',0,0,0,1400,'#d8413a');paint.material.opacity=.85;
+      paint.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(right,f,up));
+      paint.position.copy(end).addScaledVector(f,-520).addScaledVector(up,4);
+      // Striped poles on the ends of the walls.
+      for(const side of [-1,1])for(let k=0;k<4;k++) {
+        const band=new T.Mesh(new T.CylinderGeometry(13,13,80,8),stripe[k%2]);
+        band.position.copy(end).addScaledVector(f,-40).addScaledVector(right,side*280);band.position.y+=200+k*80;group.add(band);
+      }
+    });
+    const [p,q]=world.avalanche[0],f=new T.Vector3(q[0]-p[0],0,q[2]-p[2]).normalize(),across=new T.Vector3(-f.z,0,f.x);
+    const at=new T.Vector3(...p).addScaledVector(f,150);
+    for(const side of [-1,1]) {
+      const post=new T.Mesh(new T.CylinderGeometry(12,14,440,6),new T.MeshStandardMaterial({color:'#5c4633',roughness:.9}));
+      post.position.copy(at).addScaledVector(across,side*280);post.position.y+=380;group.add(post);
+    }
+    board(group,'AVALANCHE RUN',at.x,at.y+500,at.z,Math.atan2(f.x,f.z)+Math.PI,560);
   }
   // ---- Section titles, where each area begins. ----
   const title=(text,x,y,z,width,angle=0)=>{const m=groundText(group,text,x,y+3,z,width,'#41557c');m.rotation.z=angle;m.material.opacity=.55;};
@@ -278,5 +404,9 @@ export function decorateHoarfrost(group,world,renderer) {
   title('THE GLACIER',-3250,1800,-2250,1000,-Math.PI/2);
   title('THE ICEFALL',4650,2300,-5300,1000);
   title('THE SHOULDER',4900,4300,-9350,1000);
+  title('THE FROZEN FALLS',1050,4300,-10050,640,Math.PI/2);
+  title('GALE RIDGE',-450,6400,-10900,900,Math.PI/2);
+  title('THE CORNICE',-5615,7267,-14179,700,-Math.PI/2);
+  title('THE SUMMIT',-700,TOP,-14450,800,-Math.PI/2);
   return {update:(time)=>{for(const u of updates)u(time);}};
 }

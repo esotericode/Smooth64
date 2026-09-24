@@ -2,8 +2,8 @@
 //   node tools/level_map.mjs [hoarfrost|caldera|playground] [out.svg]
 // Floors are coloured by height, surfaces that behave differently get their
 // own colour, walls are dark lines, and coins, shards, stars and checkpoints
-// are marked. A world's `route` is drawn as a white line and its `reserved`
-// areas (e.g. Hoarfrost part 2) as dashed outlines.
+// are marked. A world's `route` is drawn as a white line and any `reserved`
+// areas (held for building) as dashed outlines.
 import {writeFileSync,mkdirSync} from 'node:fs';
 import {dirname} from 'node:path';
 import {SURFACE} from '../web/rules.js';

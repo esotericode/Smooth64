@@ -90,6 +90,27 @@ test('sound IDs decode by bank, with terrain offsets, and unknown IDs stay silen
   assert.deepEqual(transitionCues('ACT_LEDGE_GRAB','ACT_LEDGE_GRAB'),[]);
 });
 
+test('Hoarfrost Heights: gusts over wind floors, snow and ice underfoot, and water that splashes',async()=>{
+  const id=(bank,sound,flags=0x04)=>(bank<<28|flags<<24|sound<<16|0x8081)>>>0;
+  assert.deepEqual(soundCue(id(4,0x10)),{bed:'wind'});assert.equal(soundCue(id(4,0x11)),null);
+  // The core requests the wind on every tick spent over a wind floor.
+  const wind=await trace(Array(10).fill([0,0,0]),FLAT.map(t=>({...t,type:0x2C})));
+  assert.ok(wind.every(t=>cues([t]).includes('wind')));
+  const {ctx,audio}=await ready({random:()=>.5}),s={velocity:[0,0,0],speed:32};
+  const step=terrain=>{const before=ctx.started.length;audio.tick([id(0,0x10+terrain,6)],s,s,'ACT_WALKING','ACT_WALKING');return ctx.started[before].playbackRate.value;};
+  const plain=[0,1,3].map(step);
+  audio.setTheme({terrain:[5,6,2,3,4,5,6,7],hazard:'frost'});
+  const [snow,ice,rock]=[0,1,3].map(step);
+  assert.ok(snow<plain[0]&&ice>plain[1]&&rock===plain[2],'snow crunches low, ice rings high, rock is unchanged');
+  audio.tick(wind[0].sounds,s,s,'ACT_IDLE','ACT_IDLE');assert.ok(audio.beds.wind.amp.gain.value>0,'a wind bed');
+  audio.tick([],s,s,'ACT_IDLE','ACT_IDLE');assert.equal(audio.beds.wind,undefined,'the wind drops with the floor');
+  const [touch]=await trace([[0,0,0]],FLAT.map(t=>({...t,type:1})));
+  const before=ctx.started.length;audio.tick(touch.sounds,touch.previous,touch.s,'ACT_IDLE',touch.name);
+  assert.ok(ctx.started.slice(before).some(source=>source.buffer===audio.samples.splash.buffer),'frostbite water splashes');
+  assert.ok(audio.beds.fizz&&!audio.beds.burn,'and fizzes instead of crackling');
+  audio.setTheme();assert.deepEqual(audio.beds,{},'a new world hushes the beds');assert.equal(step(0),plain[0]);
+});
+
 test('the sprite is sliced at the sync marker, even when a decoder adds delay',async()=>{
   for(const delay of [0,.026]) {
     const {audio}=await ready({delay});
