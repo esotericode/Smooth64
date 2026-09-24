@@ -134,9 +134,10 @@ static void engine_surface_from_lib_surface( struct SM64SurfaceCollisionData *su
     }
 
     // (v2 - v1) x (v3 - v2)
-    nx = (y2 - y1) * (z3 - z2) - (z2 - z1) * (y3 - y2);
-    ny = (z2 - z1) * (x3 - x2) - (x2 - x1) * (z3 - z2);
-    nz = (x2 - x1) * (y3 - y2) - (y2 - y1) * (x3 - x2);
+    // Smooth64: 64-bit products; in s32 a large triangle's normal wrapped and could flip.
+    nx = (s64)(y2 - y1) * (z3 - z2) - (s64)(z2 - z1) * (y3 - y2);
+    ny = (s64)(z2 - z1) * (x3 - x2) - (s64)(x2 - x1) * (z3 - z2);
+    nz = (s64)(x2 - x1) * (y3 - y2) - (s64)(y2 - y1) * (x3 - x2);
     mag = sqrtf(nx * nx + ny * ny + nz * nz);
 
     // Could have used min_3 and max_3 for this...

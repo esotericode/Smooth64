@@ -59,7 +59,9 @@ test('every world uses the same power meter, fall detection, lava (or frostbite)
     core.heal(COIN_HEAL);for(let i=0;i<6;i++)state=core.tick({x:0,y:0,buttons:0,yaw:0});
     assert.equal(state.health,0x680);assert.equal(healthWedges(state.health),6);assert.equal(respawnReason(state),null);
     assert.ok(respawnReason({...state,health:0xff}));assert.ok(respawnReason({...state,position:[0,-1501,0]}));
-    assert.ok(respawnReason({...state,floor:-11000}));
+    assert.ok(respawnReason({...state,floor:-1.1e9}),'no floor at all');
+    assert.equal(respawnReason({...state,floor:-20000}),null,'a deep floor is still a floor');
+    assert.equal(respawnReason({...state,position:[0,-1501,0]},-5000),null,'a world can let you fall further');
   }
   assert.equal(healthWedges(0x880),8);assert.equal(healthWedges(-1),0);
   assert.ok(playground.triangles.filter(t=>t.type===SURFACE.LAVA).every(t=>t.vertices.every(v=>v[1]===-160)));

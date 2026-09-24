@@ -23,8 +23,6 @@ import {SURFACE} from './rules.js';
 import {createBuilder,paint} from './builder.js';
 export const FROSTBITE=SURFACE.LAVA,{HANGABLE,DEEP_SNOW,SLIPPERY,VERY_SLIPPERY,NOT_SLIPPERY,ICE,WIND}=SURFACE;
 export const ABYSS=-2600,CLOUD=-700,TOP=10100;
-// The level keeps to this many triangles; the core holds 4,096.
-export const BUDGET=3000;
 
 export const checkpoints=[
   {id:'camp',name:'Frostmere Camp',note:'The Horn waits to the north. Cross Mirror Lake to the west shore. Floes are safe; open water bites.',

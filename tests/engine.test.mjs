@@ -61,6 +61,42 @@ test('native GCC and browser WASM produce identical complete state bytes and sou
   }
 });
 
+test('no arbitrary limits: any number of triangles, far-flung, huge, towering and deep worlds',async()=>{
+  const core=await loadCore(bytes);
+  const square=(x0,z0,size,y)=>[{type:0,vertices:[[x0,y,z0],[x0,y,z0+size],[x0+size,y,z0+size]]},{type:0,vertices:[[x0,y,z0],[x0+size,y,z0+size],[x0+size,y,z0]]}];
+  const settle=position=>{core.reset(position,0);let s;for(let i=0;i<8;i++)s=core.tick({x:0,y:0,buttons:0,yaw:0});return s;};
+  // Far more triangles than the old cap of 4,096: a grid of 20,000.
+  const grid=[];for(let i=0;i<100;i++)for(let j=0;j<100;j++)grid.push(...square(i*200,j*200,200,100));
+  core.loadWorld(grid);let s=settle([19900,100,19900]);assert.equal(s.floor,100);assert.equal(s.position[1],100);
+  // 300,000 units out (the old range was 32,767), a run and jump ends within a unit or two of the same run
+  // at the origin: float rounding, not a different move.
+  const run=(world,position)=>{core.loadWorld(world);core.reset(position,0);let s;
+    for(let i=0;i<60;i++)s=core.tick({x:30,y:80,buttons:i%30<6?1:0,yaw:0});return s;};
+  const near=run(square(-10000,-10000,20000,5000),[0,5000,0]),far=run(square(-310000,280000,20000,5000),[-300000,5000,290000]);
+  assert.equal(far.speed,near.speed);assert.equal(far.action,near.action);assert.equal(far.floor,5000);
+  assert.ok(Math.hypot(far.position[0]+300000-near.position[0],far.position[2]-290000-near.position[2])<3);
+  // Single floors of two triangles hold everywhere, however big. In 32-bit math a 64,000-unit
+  // floor's normal wrapped and flipped it into a ceiling, and point tests overflowed.
+  for(const size of [64000,100000,400000]) {
+    core.loadWorld(square(-size/2,-size/2,size,100));const e=size/2-1000;
+    for(const [x,z] of [[-e,e],[e,e],[e,-e],[-e,-e],[0,0]])assert.equal(core.floor(x,200,z),100,`${size} across, at ${x},${z}`);
+  }
+  // No invisible ceiling high up, and floors far below are found.
+  core.loadWorld([...square(-1000,-1000,2000,150000),...square(-1000,-1000,2000,-150000)]);
+  s=settle([0,150000,0]);let peak=s.position[1];
+  for(let i=0;i<40;i++){s=core.tick({x:0,y:0,buttons:i<14?1:0,yaw:0});peak=Math.max(peak,s.position[1]);}
+  assert.ok(peak>150100,`a jump rises from 150,000 (peak ${peak})`);assert.equal(core.floor(0,-149000,0),-150000);
+  // The native build agrees out there too.
+  const inputs=Array.from({length:120},(_,i)=>({x:i%40<20?40:-40,y:80,buttons:i%25<5?1:0,yaw:0}));
+  const native=spawnSync('python3',['tests/trace_native.py'],{cwd:new URL('..',import.meta.url),encoding:'utf8',
+    input:JSON.stringify({triangles:square(-310000,280000,20000,5000),position:[-300000,5000,290000],yaw:0,inputs})});
+  assert.equal(native.status,0,native.stderr);const expected=JSON.parse(native.stdout);
+  core.loadWorld(square(-310000,280000,20000,5000));core.reset([-300000,5000,290000],0);
+  inputs.forEach((input,i)=>{core.tick(input);assert.equal(Buffer.from(core.stateBytes()).toString('hex'),expected[i],`tick ${i}`);});
+  // Past what the collision math can take exactly, a triangle is refused rather than wrong.
+  assert.throws(()=>core.loadWorld(square(600000000,0,1000,0)));
+});
+
 test('pause/reset clears fractional accumulated time',()=>{
   const clock=new FixedClock();let ticks=0;
   clock.advance(.02,()=>ticks++);clock.reset();clock.advance(.02,()=>ticks++);

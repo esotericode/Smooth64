@@ -153,7 +153,8 @@ class MovementTests(unittest.TestCase):
 
     def test_invalid_geometry_and_spawn_are_rejected(self):
         self.assertEqual(self.c.lib.s64_add_triangle(0,0,0,0,0,0,0,0,0,0),-1)
-        self.assertEqual(self.c.lib.s64_add_triangle(0,40000,0,0,0,0,0,0,0,1),-1)
+        self.assertEqual(self.c.lib.s64_add_triangle(0,(1<<29)+1,0,0,0,0,0,0,0,1),-1,'past the exact range of the collision math')
+        self.assertGreater(self.c.lib.s64_add_triangle(0,40000,0,0,0,0,0,0,0,1),0,'no 16-bit limit')
         self.assertEqual(self.c.lib.s64_reset(float('nan'),0,0,0),-1)
         self.assertEqual(self.c.lib.s64_reset(7000,0,7000,0),-1)
 

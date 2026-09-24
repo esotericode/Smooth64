@@ -26,8 +26,8 @@ def build(target, compiler=None):
         sdk = os.environ.get("WASI_SDK_PATH")
         cmd = shlex.split(compiler or (str(Path(sdk) / "bin/clang") if sdk else "clang"))
         flags += ["--target=wasm32-wasi", "-mexec-model=reactor"]
-        flags += ["-Wl,--gc-sections", "-Wl,-z,stack-size=1048576",
-                  "-Wl,--initial-memory=4194304", "-Wl,--max-memory=33554432"]
+        # Memory starts at 4 MB and grows as a world needs, with no ceiling of our own.
+        flags += ["-Wl,--gc-sections", "-Wl,-z,stack-size=1048576", "-Wl,--initial-memory=4194304"]
         flags += ["-Wl,--export=" + symbol for symbol in EXPORTS]
         out = ROOT / "web/smooth64.wasm"
     else:

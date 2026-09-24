@@ -185,7 +185,7 @@ function tick() {
   current=core.tick(lastInput);renderer.record(current);renderer.tick(previous,current,actions[previous.action],actionName());
   audio.tick(core.sounds(),previous,current,actions[previous.action],actionName());
   session.tick(lastInput);
-  const reason=respawnReason(current);
+  const reason=respawnReason(current,world.fallLimit);
   if(reason)respawn(reason);else collectEvents(session.collect(current,actionName()));
   return !modalOpen();
 }

@@ -110,5 +110,19 @@
     "vendor/libsm64/src/load_tex_data.h": "e4ee0bcbf31e19fd0e34996ed348a6d3528ae7556942885fbc753c799fc22871",
     "vendor/libsm64/src/obj_pool.h": "59a32a2a2f6dd7d28085af05585ab2152bc6031844ccba7b976e70f62abc5213",
     "vendor/libsm64/src/play_sound.h": "8c1bce19e849e55a7c9a04a694c57ce03aaddb708830acb9cbe716049d5b77d4"
+  },
+  "patches": {
+    "vendor/libsm64/src/decomp/engine/surface_collision.c": {
+      "sha256": "02bac367333b1e586bc894e4dbf6a4b686e9c7d78a132a0554b502d6bb803d6b",
+      "why": "Floor and ceiling point-in-triangle tests use 64-bit products: in 32 bits they overflowed for triangles over ~46,000 units across, which then vanished."
+    },
+    "vendor/libsm64/src/decomp/engine/surface_collision.h": {
+      "sha256": "a8ff9a7a6c5648f548c103058ebc6886484c5740e6b47237c0ed7797794810d8",
+      "why": "The \"no ceiling\" and \"no floor\" heights are 1e9 and -1.1e9 (libsm64 had 100,000 and -110,000), so tall and deep worlds have no invisible ceiling or missing floors."
+    },
+    "vendor/libsm64/src/load_surfaces.c": {
+      "sha256": "989d0f88638b954cfa2114fe2d5a7b0457c496630dd94505bb8c3821149dbf09",
+      "why": "Triangle normals use 64-bit products: in 32 bits a large triangle's normal wrapped and could flip a floor into a ceiling."
+    }
   }
 }

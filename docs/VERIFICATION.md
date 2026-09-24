@@ -113,6 +113,30 @@ The suite now passes **15 native tests and 83 Node tests**.
 - The browser check now drives a mocked standard gamepad alone. It picks Hoarfrost Heights on the welcome screen, opens the menu with Start, toggles a setting with A, raises a slider with right, opens the move guide, scrolls it with down, closes only the guide with B, opens the checkpoint list, travels, and resumes, with a visible focus ring throughout.
 - Narrow-lens renders of the distant peaks from across the level showed the depth-fighting stripes where the snow caps sat on the rock cones. After rebuilding them as a rock base and a snow cap that meet at one ring, the same renders are clean. The islands, the frozen falls from 20,000 away, and a normal view from camp were checked the same way.
 
+## The engine's arbitrary limits, lifted
+
+The goal the core protects is movement true to SM64, not frozen code, so its arbitrary limits are gone:
+- Triangle storage grows with the world; it was a fixed 4,096.
+- Coordinates may reach ±536,870,912; they were limited to ±32,767.
+- The WASM memory has no maximum of its own; it was 32 MB.
+- The "no ceiling" and "no floor" heights sit at ∓1.1 billion; they were 100,000 and −110,000.
+
+Two 32-bit overflows in the vendored collision code are fixed, in the floor and ceiling tests and in triangle normals. They were real bugs even inside the old range: a single floor 64,000 units across was missing at all 1,849 sample points, because its normal wrapped and turned it into a ceiling. The new engine finds it everywhere.
+
+- The WASM build is reproducible: rebuilding the unchanged source with the pinned wasi-sdk-25 gave the committed `web/smooth64.wasm` byte for byte.
+- Movement is unchanged: 75 runs of 900 ticks of random input with coin heals, from every checkpoint in all three worlds, gave identical state bytes in every field on every tick from the old and new builds (67,500 ticks).
+- `tests/engine.test.mjs` adds proofs:
+  - 20,000 triangles in one world;
+  - a run and jump 300,000 units out, ending within 3 units of the same run at the origin, at the same speed;
+  - single floors 64,000, 100,000 and 400,000 across, held at their corners;
+  - a jump from a floor at 150,000 with no invisible ceiling;
+  - a floor at −150,000 found;
+  - native and WASM agreeing tick for tick far from the origin;
+  - out-of-range geometry refused.
+- `tools/check_vendor.py` still checks 105 vendored files against upstream byte for byte, and each of the 3 patched files against its recorded hash and reason.
+
+The suite passes **15 native tests and 84 Node tests**.
+
 ## Practical limits
 
 The polish pass was exercised in headless Chromium with software WebGL, including desktop (1280 × 800), touch (390 × 844), and the offline single-file build. The browser regression check passes with no JavaScript or WebGL errors, including storage-unavailable fallback and zero network asset requests in the offline build. Desktop and touch screenshots were inspected. This is automated interaction and visual verification, not a human play session. Gamepad edges are tested with mocked standard-gamepad input; physical gamepad behavior, Firefox/Safari, and performance on target devices still need hands-on verification.
