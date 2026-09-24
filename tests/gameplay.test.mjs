@@ -3,18 +3,19 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createWorld} from '../web/world.js';
 import {createCaldera} from '../web/caldera.js';
+import {createHoarfrost} from '../web/hoarfrost.js';
 import {LevelSession,bodyCenter,formatTime} from '../web/level.js';
 import {loadCore,FixedClock} from '../web/engine.js';
 import {SURFACE,COIN_HEAL,healthWedges,respawnReason} from '../web/rules.js';
 import {DEFAULT_SETTINGS,loadSettings,saveSettings} from '../web/settings.js';
 
-const playground=createWorld(),caldera=createCaldera();
+const playground=createWorld(),caldera=createCaldera(),hoarfrost=createHoarfrost();
 const bytes=readFileSync(new URL('../web/smooth64.wasm',import.meta.url));
 const actions=JSON.parse(readFileSync(new URL('../web/actions.json',import.meta.url)));
 const standAt=position=>({position:[position[0],position[1]-80,position[2]],yaw:0,velocity:[0,0,0],
   speed:0,health:0x880,action:0x0C400201,animation:197,frame:0,tick:0});
 
-for(const world of [playground,caldera])test(`${world.name}: shared coins, checkpoint recovery and restart`,()=>{
+for(const world of [playground,caldera,hoarfrost])test(`${world.name}: shared coins, checkpoint recovery and restart`,()=>{
   const session=new LevelSession(world),coin=world.pickups.find(p=>p.kind==='coin');
   assert.equal(world.pickups.some(p=>p.kind==='spark'),false);
   const events=session.collect(standAt(coin.position),'ACT_IDLE');
@@ -48,9 +49,9 @@ test('a knockout cannot pick up healing, finish the level, or change its checkpo
   assert.equal(session.found.size,0);assert.equal(session.checkpoint,0);assert.equal(session.finishTicks,null);
 });
 
-test('both worlds use the same power meter, fall detection, lava damage and coin healing',async()=>{
+test('every world uses the same power meter, fall detection, lava (or frostbite) damage and coin healing',async()=>{
   const core=await loadCore(bytes);
-  for(const [world,position] of [[playground,[-2400,-160,4700]],[caldera,[2000,0,1500]]]) {
+  for(const [world,position] of [[playground,[-2400,-160,4700]],[caldera,[2000,0,1500]],[hoarfrost,[0,0,4000]]]) {
     core.loadWorld(world.triangles);core.reset(position,0);
     let state=core.tick({x:0,y:0,buttons:0,yaw:0});assert.equal(actions[state.action],'ACT_LAVA_BOOST');
     for(let i=0;i<14;i++)state=core.tick({x:0,y:0,buttons:0,yaw:0});

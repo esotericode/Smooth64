@@ -4,6 +4,8 @@ const standardPad=()=>Array.from(navigator.getGamepads?.()||[]).find(p=>p?.mappi
 const padButtons=pad=>pad?((pad.buttons[0]?.pressed?1:0)|(pad.buttons[2]?.pressed||pad.buttons[1]?.pressed?2:0)|
   (pad.buttons[6]?.pressed||pad.buttons[7]?.pressed?4:0)):0;
 export const DEFAULT_DEADZONE=.15;
+// Menu directions from the D-pad (standard buttons 12-15) or the left stick.
+const NAV=[['up',12,1,-1],['down',13,1,1],['left',14,0,-1],['right',15,0,1]];
 
 // Scaled radial dead zone: inside `zone` a stick reads exactly zero, so worn
 // or drifting sticks stay still; the remaining travel is rescaled to 0..1.
@@ -29,6 +31,9 @@ export class Input {
     this.keys=new Set();this.pending=0;this.touchButtons=0;this.stick=[0,0];
     this.orbit=0;this.pitch=0;this.zoom=0;this.gamepadName='Keyboard';
     this.lastPad=0;this.blockedPad=0;this.menuHeld=false;this.drag=null;this.touchPointer=null;this.releaseTouches=[];
+    // Gamepad menu actions go here ('up', 'down', 'left', 'right', 'accept',
+    // 'back', and 'start', which returns true when it is used up).
+    this.onNavigate=null;this.nav=null;
     window.addEventListener('keydown',e=>{
       if(e.target.closest?.('input,select,textarea,[contenteditable="true"]'))return;
       // Let focused menu buttons, links and disclosures use native keyboard input.
@@ -90,11 +95,26 @@ export class Input {
     if(value===this.enabled)return;
     this.enabled=value;this.clear();this.blockedPad=padButtons(standardPad());
   }
-  pollCommands() {
+  pollCommands(menus=false,now=performance.now()) {
     const pad=standardPad(),pressed=!!pad?.buttons[9]?.pressed;
     this.gamepadName=pad?'Gamepad':'Keyboard';
-    if(pressed&&!this.menuHeld)this.command('Escape');
+    if(pressed&&!this.menuHeld&&!this.onNavigate?.('start'))this.command('Escape');
     this.menuHeld=pressed;
+    this.pollMenus(menus?pad:null,now);
+  }
+  // In menus and on the welcome screen: the D-pad or left stick moves
+  // (repeating while held, like arrow keys), A accepts and B backs out.
+  // Anything already held when a menu appears waits to be released.
+  pollMenus(pad,now) {
+    if(!pad||!this.onNavigate){this.nav=null;return;}
+    const buttons=['accept','back'].filter((_,i)=>pad.buttons[i]?.pressed);
+    const direction=NAV.find(([,button,axis,sign])=>pad.buttons[button]?.pressed||(pad.axes[axis]??0)*sign>.55)?.[0]??null;
+    const nav=this.nav;
+    if(!nav){this.nav={direction,next:Infinity,buttons};return;}
+    for(const action of buttons)if(!nav.buttons.includes(action))this.onNavigate(action);
+    nav.buttons=buttons;
+    if(direction!==nav.direction){nav.direction=direction;nav.next=now+380;if(direction)this.onNavigate(direction);}
+    else if(direction&&now>=nav.next){nav.next=now+110;this.onNavigate(direction);}
   }
   sample(yaw) {
     if(!this.enabled)return {x:0,y:0,buttons:0,yaw:Math.round(yaw*32768/Math.PI)};

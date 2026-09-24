@@ -1,5 +1,6 @@
 import {createWorld} from './world.js';
 import {createCaldera} from './caldera.js';
+import {createHoarfrost} from './hoarfrost.js';
 import {animationName} from './animations.js';
 import {loadCore,FixedClock} from './engine.js';
 import {Input} from './input.js';
@@ -9,6 +10,7 @@ import {HEALTH,healthWedges,respawnReason} from './rules.js';
 import {loadSettings,saveSettings,SETTING_RANGES} from './settings.js';
 import {actionCue} from './pose.js';
 import {GameAudio} from './audio.js';
+import {area,controls,nearest} from './menus.js';
 
 const $=id=>document.getElementById(id);
 const canvas=$('game'),menu=$('menu'),help=$('help'),victory=$('victory');
@@ -65,8 +67,8 @@ function buildZoneList() {
 function setMode(next) {
   cancelRespawn();clearTimeout(toastTimer);$('toast').hidden=true;
   mode=next;world=worlds[next];session=sessions[next];debugPaused=false;slow=false;
-  core.loadWorld(world.triangles);renderer.load(world);
-  document.body.classList.toggle('caldera',mode==='caldera');
+  core.loadWorld(world.triangles);renderer.load(world);audio.setTheme(world.theme?.audio);
+  document.body.classList.toggle('caldera',mode==='caldera');document.body.dataset.world=mode;
   buildZoneList();reset(session.checkpoint);applySettings();
   for(const button of document.querySelectorAll('[data-mode]'))button.setAttribute('aria-pressed',button.dataset.mode===mode);
 }
@@ -77,7 +79,7 @@ function start(next='caldera') {
   for(const id of ['menu-button','level-hud','location'])$(id).hidden=false;
   applySettings();
   if(world.intro)renderer.flyover(world.intro.from,world.intro.look);
-  toast(mode==='caldera'?'Reach the Ember Star at the summit. Start through the broken gate.':'Explore at your own pace. Every practice area is in the Menu.',5000);
+  toast(world.text?.start??'Explore at your own pace. Every practice area is in the Menu.',5000);
   canvas.focus();
 }
 function openMenu() {
@@ -119,7 +121,7 @@ function respawn(message) {
 }
 $('fade').addEventListener('animationend',()=>$('fade').hidden=true);
 function collectEvents(events) {
-  let victoryKind=null;
+  let won=null;
   // One sound per kind per tick, however many pickups it collected.
   for(const type of new Set(events.map(event=>event.type))) {
     if(type==='checkpoint')audio.cue(events.some(event=>event.first)?'checkpoint':'beacon');
@@ -137,35 +139,37 @@ function collectEvents(events) {
         else if(count.found===count.total)toast(`${event.pickup.route} complete!`);
       }
     } else if(event.type==='shard') {
-      renderer.effects.burst(p,{count:22,speed:280,size:30,color:'#ffd0c8',end:'#ff2b1f',life:.6});bump('shard-count');
-      const shards=session.count('shard');toast(`Ember Shard ${shards.found} of ${shards.total}`);
-    } else if(event.type==='reveal')toast('Every shard found! The Crimson Star waits on the lava altar.',5000);
+      const [,deep,light]=renderer.theme.shard??[,'#ff2b1f','#ffd0c8'];
+      renderer.effects.burst(p,{count:22,speed:280,size:30,color:light,end:deep,life:.6});bump('shard-count');
+      const shards=session.count('shard');toast(`${world.text.shard} ${shards.found} of ${shards.total}`);
+    } else if(event.type==='reveal')toast(world.text.reveal,5000);
     else if(event.type==='checkpoint') {
       renderer.effects.ring(p,{count:16,speed:260,rise:160,size:40,grow:60,color:'#ffe1a0',end:'#ff6a1f',glow:true,life:.7});
       toast(`${event.first?'Checkpoint lit':'Checkpoint'} · ${event.checkpoint.name}`);
     } else if(event.type==='star'||event.type==='bonus') {
-      renderer.effects.burst(p,{count:48,speed:420,size:40,color:'#fff6d0',end:event.type==='star'?'#ffb000':'#ff2b3a',life:1,up:200});
-      victoryKind=event.type;
+      const end=renderer.theme.stars?.[event.type]?.[1]??(event.type==='star'?'#ffb000':'#ff2b3a');
+      renderer.effects.burst(p,{count:48,speed:420,size:40,color:'#fff6d0',end,life:1,up:200});
+      won=event;
     }
   }
-  if(victoryKind)showVictory(victoryKind);
+  if(won)showVictory(won.type,won.pickup);
 }
-function showVictory(kind) {
-  const coins=session.count('coin'),shards=session.count('shard'),best=bestTime(kind==='star'?session.time:null);
-  write('victory-eyebrow',`STAR GET · ${session.stars} OF 2`);
-  write('victory-title',kind==='star'?'Ember Star claimed.':'Crimson Star claimed.');
-  write('victory-copy',kind==='star'
-    ?(session.found.has('crimson-star')?'Both stars are yours. The caldera is conquered!':shards.found===shards.total?'The summit is yours. The Crimson Star waits on the lava altar.'
-      :`The summit is yours${best?` · best ${formatTime(best)}`:''}. ${shards.total-shards.found} Ember Shards still hide in the caldera.`)
-    :(session.found.has('ember-star')?'Both stars are yours. The caldera is conquered!':'Every shard is yours. The Ember Star still waits at the summit.'));
+const starTotal=()=>session.count('star').total+session.count('bonus').total;
+function showVictory(kind,pickup) {
+  // The best time counts only the world's goal star (any star when it names none).
+  const coins=session.count('coin'),shards=session.count('shard');
+  const best=bestTime(kind==='star'&&(!world.goal||pickup.id===world.goal)?session.time:null);
+  const {title,copy}=world.text.victory(kind,{session,shards,pickup,best:best&&formatTime(best)});
+  write('victory-eyebrow',`STAR GET · ${session.stars} OF ${starTotal()}`);
+  write('victory-title',title);write('victory-copy',copy);
   write('victory-time',formatTime(session.time));write('victory-coins',`${coins.found} / ${coins.total}`);
   write('victory-shards',`${shards.found} / ${shards.total}`);write('victory-deaths',session.deaths);
   victory.showModal();syncPause();
 }
 function bestTime(time) {
   try {
-    const best=Number(localStorage.getItem('smooth64-caldera-best'))||null;
-    if(time&&(!best||time<best))localStorage.setItem('smooth64-caldera-best',time);
+    const key=`smooth64-${world.kind}-best`,best=Number(localStorage.getItem(key))||null;
+    if(time&&(!best||time<best))localStorage.setItem(key,time);
     return best&&time?Math.min(best,time):best||time;
   } catch {return time;}
 }
@@ -207,6 +211,41 @@ function command(key) {
   }
   return false;
 }
+// Gamepad menus: the open dialog, or the welcome screen before play.
+function menuRoots() {
+  const dialog=[victory,help,menu].find(d=>d.open);
+  return dialog?[dialog]:started?[]:[$('welcome'),document.querySelector('.header-actions')];
+}
+function navigate(action) {
+  document.body.classList.add('pad-nav');
+  const roots=menuRoots();if(!roots.length)return false;
+  const items=controls(roots),here=items.includes(document.activeElement)?document.activeElement:null;
+  // Start picks the focused world on the welcome screen; otherwise it opens or closes the menu.
+  if(action==='start')return !started&&!!here&&(here.click(),true);
+  if(action==='back')return roots[0].tagName==='DIALOG'&&command('Escape');
+  // The first press shows where focus is: the dialog's own choice, or the first world.
+  if(!here) {
+    const first=items.find(el=>el.autofocus)??items.find(el=>el.classList.contains('primary'))??items[0];
+    first?.focus();if(action==='accept')first?.click();return true;
+  }
+  if(action==='accept'){if(here.type!=='range')here.click();return true;}
+  if(here.type==='range'&&(action==='left'||action==='right')) {
+    if(action==='left')here.stepDown();else here.stepUp();
+    here.dispatchEvent(new Event('input',{bubbles:true}));return true;
+  }
+  const target=items[nearest(area(here),items.map(area),action)];
+  // In a long dialog, scroll toward the next control a step at a time, so
+  // text between controls (the move guide) can be read on the way.
+  const box=roots[0];
+  if((action==='up'||action==='down')&&box.scrollHeight>box.clientHeight) {
+    const view=box.getBoundingClientRect(),sign=action==='down'?1:-1,rect=target&&area(target);
+    const hidden=rect?(sign>0?rect.bottom-view.bottom+16:view.top+16-rect.top):Infinity;
+    const room=sign>0?box.scrollHeight-box.clientHeight-box.scrollTop:box.scrollTop;
+    if(hidden>0&&room>0){const by=Math.min(hidden,view.height*.6,room);box.scrollBy(0,sign*by);if(by<hidden)return true;}
+  }
+  if(target){target.focus({preventScroll:true});target.scrollIntoView({block:'nearest'});}
+  return true;
+}
 function drawPowerMeter(health) {
   const wedges=healthWedges(health);if(wedges===meterWedges)return;meterWedges=wedges;
   const meter=$('power-meter'),ctx=meter.getContext('2d');
@@ -227,11 +266,7 @@ function renderMenu() {
   write('objective-summary',world.freeTravel?'Practice every move, follow the coins, and try the lava crossing. All destinations are open.':world.zones[session.checkpoint].note);
   $('objectives').hidden=world.freeTravel;
   write('menu-coins',`${coins.found} / ${coins.total} coins`);write('menu-deaths',`${session.deaths} retries`);
-  write('shard-total',`${shards.found} / ${shards.total}`);
-  $('goal-star').classList.toggle('done',session.found.has('ember-star'));
-  $('goal-shards').classList.toggle('done',shards.total>0&&shards.found===shards.total);
-  $('goal-bonus').classList.toggle('done',session.found.has('crimson-star'));
-  $('goal-bonus').classList.toggle('locked',shards.found<shards.total);
+  renderObjectives(shards);
   document.querySelectorAll('[data-zone]').forEach((button,index)=>{
     const zone=world.zones[index],count=session.route(zone.name),available=session.canVisit(index);
     button.disabled=!available;button.classList.toggle('active',index===session.checkpoint);
@@ -239,13 +274,26 @@ function renderMenu() {
     button.querySelector('small').textContent=!available?'Not reached':count.total?`${count.found}/${count.total} coins`:index===session.checkpoint?'Current':'';
   });
 }
+// Each world lists its own objectives: a star, the shard count, a locked goal.
+function renderObjectives(shards) {
+  const list=$('objectives');list.replaceChildren();
+  for(const goal of world.text?.objectives??[]) {
+    const item=document.createElement('li'),icon=document.createElement('i'),copy=document.createElement('span'),name=document.createElement('b');
+    icon.setAttribute('aria-hidden','true');icon.textContent=goal.icon;name.textContent=goal.title;
+    if(goal.shards){const count=document.createElement('em');count.textContent=`${shards.found} / ${shards.total}`;name.append(count);item.classList.add('shard-goal');}
+    copy.append(name,goal.note);item.append(icon,copy);
+    item.classList.toggle('done',goal.shards?shards.total>0&&shards.found===shards.total:!!goal.star&&session.found.has(goal.star));
+    item.classList.toggle('locked',!!goal.locked||(!!goal.needsShards&&shards.found<shards.total));
+    list.append(item);
+  }
+}
 function renderHud() {
   const coins=session.count('coin'),shards=session.count('shard'),stars=session.count('star').total+session.count('bonus').total;
   drawPowerMeter(current.health);write('coin-count',coins.found);write('coin-total',`/${coins.total}`);
   write('shard-count',shards.found);write('shard-max',`/${shards.total}`);$('shards-hud').hidden=!shards.total;
   write('star-count',session.stars);write('star-max',`/${stars}`);$('stars-hud').hidden=!stars;
   $('coins-hud').setAttribute('aria-label',`Coins: ${coins.found} of ${coins.total}`);
-  $('shards-hud').setAttribute('aria-label',`Ember Shards: ${shards.found} of ${shards.total}`);
+  $('shards-hud').setAttribute('aria-label',`${world.text?.shards??'Shards'}: ${shards.found} of ${shards.total}`);
   $('stars-hud').setAttribute('aria-label',`Stars: ${session.stars} of ${stars}`);
   write('level-time',formatTime(session.time));write('world-name',world.name);
   write('checkpoint-name',`Checkpoint · ${world.zones[session.checkpoint].name}`);
@@ -262,7 +310,7 @@ function renderHud() {
   ctx.fillStyle='#d37537';ctx.beginPath();ctx.arc(50+lastInput.x/80*30,50-lastInput.y/80*30,6,0,Math.PI*2);ctx.fill();
 }
 function frame(now) {
-  const dt=Math.min((now-last)/1000||0,.1);last=now;input.pollCommands();
+  const dt=Math.min((now-last)/1000||0,.1);last=now;input.pollCommands(!started||modalOpen(),now);
   if(paused()||respawning)audio.hush();
   audio.pauseMusic(modalOpen());
   if(started&&!modalOpen()) {
@@ -287,6 +335,7 @@ function frame(now) {
 
 $('start').addEventListener('click',()=>start('playground'));
 $('start-level').addEventListener('click',()=>start('caldera'));
+$('start-frost').addEventListener('click',()=>start('hoarfrost'));
 $('menu-button').addEventListener('click',openMenu);
 $('close-menu').addEventListener('click',()=>menu.close());
 $('resume-button').addEventListener('click',()=>{debugPaused=false;menu.close();});
@@ -311,17 +360,19 @@ for(const button of document.querySelectorAll('[data-mode]'))button.addEventList
   menu.close();
 });
 window.addEventListener('blur',()=>{if(started&&!modalOpen())openMenu();});
+// The gamepad's focus ring gives way to the mouse, touch or keyboard.
+for(const type of ['pointerdown','keydown','wheel'])window.addEventListener(type,()=>document.body.classList.remove('pad-nav'),{capture:true,passive:true});
 document.addEventListener('visibilitychange',()=>{audio.setHidden(document.hidden);if(document.hidden&&started&&!modalOpen())openMenu();});
 
 try {
-  worlds={playground:createWorld(),caldera:createCaldera()};
+  worlds={playground:createWorld(),caldera:createCaldera(),hoarfrost:createHoarfrost()};
   sessions=Object.fromEntries(Object.entries(worlds).map(([key,value])=>[key,new LevelSession(value)]));
   const [wasm,actionResponse]=await Promise.all([fetch('smooth64.wasm'),fetch('actions.json')]);
   if(!wasm.ok||!actionResponse.ok)throw new Error('Could not load the game files.');
   [core,actions]=await Promise.all([wasm.arrayBuffer().then(loadCore),actionResponse.json()]);
-  renderer=new PlaygroundRenderer(canvas);input=new Input(canvas,command);setMode('caldera');
+  renderer=new PlaygroundRenderer(canvas);input=new Input(canvas,command);input.onNavigate=navigate;setMode('caldera');
   renderer.camera.position.set(2700,4000,6200);renderer.camera.lookAt(0,1700,0);
-  $('start').disabled=false;$('start-level').disabled=false;$('menu-button').disabled=false;
+  $('start').disabled=false;$('start-level').disabled=false;$('start-frost').disabled=false;$('menu-button').disabled=false;
   write('status','Ready when you are.');requestAnimationFrame(frame);
 } catch(error) {
   console.error(error);write('status','Unable to start');

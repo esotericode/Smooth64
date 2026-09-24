@@ -79,6 +79,40 @@ In Chromium, the browser check confirms that the music starts only when play beg
 
 Commands are in the README. The cross-compiler test runs the same inputs through the actual native shared library and committed WASM, not a JavaScript rewrite of physics.
 
+## Hoarfrost Heights
+
+The suite now passes **15 native tests and 80 Node tests**. `tests/hoarfrost.test.mjs` drives the unchanged core through the whole level with controller plans from `tests/routes.mjs`:
+
+- Geometry: 2,698 triangles, within the level's 3,000 budget (the core holds 4,096). Integer coordinates, no degenerate triangles, frostbite water only ever a floor at y = 0, a catch floor under every gap, every pickup over solid ground except the five coins that trace a move over a gap (each tested with that move), unique ids, and exactly 8 shards, 2 stars, 1 bonus star, 9 checkpoints and 100 coins.
+- Every checkpoint settles on its own floor.
+- Surfaces as the level assumes: frostbite water costs three wedges and launches you; ice keeps skidding after you let go mid-run, but a landing stops you dead; the grippy rock rib climbs where its icy twin cannot; deep snow caps a run at ~24; standing still on a Gale Ridge path, the wind blows you off it to the south, while the Weathervane's tower top is out of the wind.
+- Main route, all seven parts:
+  - camp → floes → the tilted floe's slide jump → the ice runway → the long jump (a plain jump falls into the water);
+  - the deep-snow grabs, the broken iced log, and the slippery ramp;
+  - the crevasse jump, the snow bridge, and the chute. It slides at over 80 units a tick, at least eight jump points before the lip clear the Great Crevasse, and sliding off without a jump fails. A good jump collects both arc coins;
+  - the serac grab, 950 units of chimney wall kicks, the rock rib, the bergschrund, and the cairn under the Icefall Star;
+  - the ledges west and both breaks (walking off one falls), 800 units of wall kicks between the frozen curtain and the serac (no jump, double jump or backflip reaches its top), the hang across the curtain, which collects the coin along it (no plain or double jump reaches the far ledge), and the rock rib to the top of the falls;
+  - Gale Ridge: onto the first path, then each gap in the wind, path to path;
+  - onto the west ridge's rock steps and up them, the cornice hang to the summit ledge (jumps, double jumps and long jumps from the steps never get there), the chimney's wall kicks (nothing less reaches a tower top), the rock ramp, and the Aurora Star.
+- The Avalanche Run: a steering plan slides from the summit to camp, jumping both lips, and collects all ten of its coins; sliding on without jumping, a lip throws you off.
+- All eight Frost Shards. The watchtower needs a backflip or double jump (a single jump cannot reach it). The Lone Floe needs you to stop on landing. Each of the Great Pine's four boughs is climbed. The crevasse ledge is reached by hanging and dropping, then wall-kicking out. The serac needle needs a double jump (a single jump falls short). The Frozen Falls' pillar is reached by letting go of the overhang, no plain jump from either ledge lands on it, and from it you can hang on to the far ledge. The Weathervane is reached with a jump from the promontory's edge, and home again only with a long jump (a plain jump falls short). The Horn's Tip needs wall kicks up the tor (no jump, double jump or backflip gets above y 11,000).
+- The Polar Star's spire: a double jump and grab reaches its top, a single jump cannot, and the star and its three coins are in reach from there.
+- The session: the Icefall Star leaves the clock running and points on to the Frozen Falls; the Aurora Star stops it; the Polar Star stays hidden until the eighth shard reveals it; the victory copy counts the shards left. The menu objectives name real pickups.
+- Native/WASM parity: all 80 state bytes on every tick of 300-tick random input streams from each of the nine checkpoints, with coin heals mixed in (2,700 ticks).
+
+`tests/audio.test.mjs` covers the level's sound: wind floors hold a gusting wind bed, footsteps are re-mapped to snow and ice, and frostbite water splashes and fizzes instead of burning.
+
+The shared gameplay tests include the level: coins, checkpoint recovery, restart, and frostbite damage with coin healing. The browser check switches between all three worlds, checks Hoarfrost's HUD totals (eight shards) and objectives, and confirms that visiting it leaves the Caldera's progress intact. During development, a scan dropped the explorer over a grid covering the whole level. Every fall either settled somewhere with a way out, ended in a ledge grab, or dropped into the clouds. Slopes that could have trapped a fall (under the bergschrund, a hollow between the Horn and a lesser peak, and slopes running into walls on Gale Ridge) were removed or reshaped.
+
+## Version 0.7.1: controller menus, the coin chime, steady far peaks
+
+The suite now passes **15 native tests and 83 Node tests**.
+
+- `tests/input.test.mjs`: in menus, a D-pad press moves once, then repeats after 380 ms every 110 ms while held; the left stick counts past halfway; A and B fire once per press; a button already held when a menu appears waits to be released; nothing moves menus during play; and Start can pick a focused world on the welcome screen or else opens the menu. `menus.js`'s direction search is checked on a grid: the nearest control in line, nothing beyond the edges, a neighbour in the same row never counts as below, a wide row is not to the right of a button under it, and ties go to the control lined up with the row's start.
+- `tests/audio.test.mjs`: coins play the generated chime, not the sprite's sample. It is under half a second, its zero crossings put it between C5 and G5, it is peak-normalised like the sprite with a measured loudness, and it starts without a click. Rendered in Chromium against the old sample, the loudest frequency moved from about 2,950 Hz to 525 Hz, the share of energy above 2 kHz from nearly all of it to 0.1%, and the cue plays 5 dB quieter.
+- The browser check now drives a mocked standard gamepad alone. It picks Hoarfrost Heights on the welcome screen, opens the menu with Start, toggles a setting with A, raises a slider with right, opens the move guide, scrolls it with down, closes only the guide with B, opens the checkpoint list, travels, and resumes, with a visible focus ring throughout.
+- Narrow-lens renders of the distant peaks from across the level showed the depth-fighting stripes where the snow caps sat on the rock cones. After rebuilding them as a rock base and a snow cap that meet at one ring, the same renders are clean. The islands, the frozen falls from 20,000 away, and a normal view from camp were checked the same way.
+
 ## Practical limits
 
 The polish pass was exercised in headless Chromium with software WebGL, including desktop (1280 × 800), touch (390 × 844), and the offline single-file build. The browser regression check passes with no JavaScript or WebGL errors, including storage-unavailable fallback and zero network asset requests in the offline build. Desktop and touch screenshots were inspected. This is automated interaction and visual verification, not a human play session. Gamepad edges are tested with mocked standard-gamepad input; physical gamepad behavior, Firefox/Safari, and performance on target devices still need hands-on verification.

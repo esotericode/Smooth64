@@ -7,14 +7,41 @@
 
 1. Download and extract the ZIP.
 2. Double-click **Smooth64-Play.html**.
-3. Click **Cinder Caldera** for the level, or **Movement playground** for the test areas.
+3. Click **Cinder Caldera** or **Hoarfrost Heights** to play a level, or **Movement playground** for the test areas.
 
-Works offline in Edge, Chrome, or Firefox. No installation, Python, terminal, compiler, or ROM required. **WASD** moves, **Space** jumps, **Shift** crouches, **J** attacks. Sound and music start after your first click or key press.
+Works offline in Edge, Chrome, or Firefox. No installation, Python, terminal, compiler, or ROM required. **WASD** moves, **Space** jumps, **Shift** crouches, **J** attacks. A standard gamepad works too, menus included. Sound and music start after your first click or key press.
 
 The original recovery ZIP is kept in this repository. The folders below contain the editable project source.
 
 
-A ROM-free platformer built around the Super Mario 64 US movement code, with an original explorer, a volcanic adventure, and a connected practice playground.
+A ROM-free platformer built around the Super Mario 64 US movement code, with an original explorer, a volcanic adventure, a mountain of ice to climb, and a connected practice playground.
+
+## Version 0.7.1 — menus for controllers, a softer coin
+
+- **Every menu works from a gamepad.** On the welcome screen, in the pause menu, the move guide and the star screen, the D-pad or left stick moves between choices, **A** selects, **B** goes back, and left or right sets a slider. Long pages scroll as you go, and an orange ring shows where you are.
+- **A gentler coin.** The bright arcade ding is replaced by two soft mallet notes, generated in code: it rings around 520 Hz instead of 3 kHz, and plays 5 dB quieter.
+- **No more flicker on the far peaks.** In Hoarfrost Heights, the distant mountains' snow caps no longer shimmer against their rock at a distance, and a few overlays that could do the same (the frozen falls' glint, the hut's windows, painted titles) now stay steady.
+
+[Controller and polish release notes](docs/releases/v0.7.1.md)
+
+## Version 0.7.0 — Hoarfrost Heights
+
+A second full level, much bigger than Cinder Caldera: about five times the footprint and three times the height. A high valley floats on a sea of cloud under the **Hoarfrost Horn**. You climb from Frostmere Camp to the summit, then ride the Avalanche Run home:
+
+1. **Mirror Lake:** hop across floes over frostbite water. The water bites like lava, as in the original's snowy course. A tilted ice floe slides you straight into a jump, and an ice runway you cannot stop on ends in a long jump.
+2. **Pinewood Drifts:** terraces of deep snow that slow your run, and a jump and grab out of each. A fallen, iced-over pine spans a ravine, snapped in two.
+3. **The Glacier:** crevasses, a snow bridge, and an ice chute. You slide at over 90 units a tick and must jump before the lip to clear the Great Crevasse.
+4. **The Icefall:** a serac step, a 950-unit wall-kick chimney, then a grippy rock rib beside an ice chute that cannot be climbed, up to the **Icefall Star** on the Shoulder, halfway up the Horn.
+5. **The Frozen Falls:** ledges along the Horn's sheer face, wall kicks between a frozen waterfall and a serac, and a hang from the icicles across the curtain.
+6. **Gale Ridge:** paths cut into the face, in a wind that always blows south. Stand still and it blows you off, so keep moving and jump each gap from its very edge.
+7. **The Cornice and the Summit:** rock steps up the west ridge, a hang under a snow cornice above the slick crest, a wall-kick chimney between two towers, and the **Aurora Star** on the summit cairn, where the clock stops.
+8. **The Avalanche Run:** the way home, an ice luge from the summit round the Horn and over the lake into camp. Jump from the slide at each of its two lips.
+
+Blue ice will not hold you: you slide down any slope of it, a full run skids ~1,200 units, and landing a jump and letting go of the stick is how you stop dead. Deep snow caps your run; grey rock grips even at 45°. **Eight Frost Shards** hide behind optional challenges: the watchtower, the Lone Floe, the Great Pine, a crevasse ledge, a serac needle, an ice pillar under the icicles, the Weathervane across a windy gulf, and the Horn's Tip. Find all eight and the **Polar Star** shines on the Mirror Isle. Nine beacons are checkpoints, and 100 coins line the way. Footsteps crunch on snow and ring on ice, the wind gusts on Gale Ridge, and frostbite water splashes instead of sizzling. Twilight, snowfall and an aurora overhead are drawn in real time.
+
+Every leg of the route, every shard and the Polar Star are proven reachable in `tests/hoarfrost.test.mjs` by driving the real core with controller inputs. Negative checks show where a specific move is required.
+
+[Design notes](docs/HOARFROST.md) · [Hoarfrost Heights release notes](docs/releases/v0.7.0.md)
 
 ## Version 0.6.0 — original music
 
@@ -91,7 +118,7 @@ Clone this branch, then run:
 python3 tools/serve.py
 ```
 
-Open **http://localhost:8000** and select **Cinder Caldera** or **Movement playground**. On Windows, `py tools/serve.py` also works.
+Open **http://localhost:8000** and select **Cinder Caldera**, **Hoarfrost Heights**, or **Movement playground**. On Windows, `py tools/serve.py` also works.
 
 Python 3 and a current browser with WebGL 2/WebAssembly are all you need. The compiled movement core and renderer are included. No npm install, compiler, ROM, CDN, or account is needed to play. Opening `index.html` directly as a `file:` URL will not work; use the local server. The `web/` directory is also a complete static build suitable for a normal HTTP server.
 
@@ -110,7 +137,8 @@ The playground contains a runway, walkable ramps, a steep slippery slope, a wall
 | Advance one tick (developer tools) | N | On-screen button |
 | Quarter speed (developer tools) | T | On-screen button |
 | Collision mesh (developer tools) | V | On-screen button |
-| Move guide | ? or H | Controls button |
+| Move guide | ? or H | Menu → Controls & moves |
+| Menus: move / select / back | Tab / Space or Enter / Escape | D-pad or left stick / A / B |
 | Sound and music volume, stick dead zone | Menu → Settings | Start → Settings |
 
 Touch devices get an analog pad and A/B/Z buttons. Keyboard buttons retain very short taps until the next simulation tick. Gamepad input is sampled on simulation ticks, with a 15% radial dead zone on both sticks. Losing window focus pauses the simulation and clears keyboard input.
@@ -132,7 +160,7 @@ The core's original timings apply; there is no added coyote time, automatic bunn
 ```text
 core/               Small C host and public API; movement timing/root-motion tables
 vendor/libsm64/     Pinned upstream C actions, math, collision adapter, and headers
-web/                Original levels (playground, Cinder Caldera), procedural character rig, input, camera, and UI
+web/                Original levels (playground, Cinder Caldera, Hoarfrost Heights), geometry kit, procedural character rig, input, camera, and UI
 tests/              Behavioral checks and native ↔ WASM frame-by-frame comparisons
 tools/              Build, serve, import, and provenance checks
 docs/               Fidelity, architecture, and verification notes
@@ -168,7 +196,7 @@ python3 tools/package_browser.py
 npm run test:browser
 ```
 
-The browser check writes review screenshots under `build/browser-checks/`. Set `BROWSER_EXECUTABLE_PATH` to use an existing Chromium executable. Playwright is only needed for this optional check; playing the game and running the movement suite still need no npm packages.
+The browser check writes review screenshots under `build/browser-checks/`. For level work, `node tools/level_map.mjs hoarfrost` draws a top-down SVG map of a level's floors, route and pickups, and `node tools/level_shots.mjs` renders screenshots from chosen camera positions (Playwright, like the browser check). Set `BROWSER_EXECUTABLE_PATH` to use an existing Chromium executable. Playwright is only needed for this optional check; playing the game and running the movement suite still need no npm packages.
 
 Rebuild the checked-in browser core with [WASI SDK 25](https://github.com/WebAssembly/wasi-sdk/releases/tag/wasi-sdk-25):
 

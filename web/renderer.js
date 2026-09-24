@@ -3,6 +3,13 @@ import {ExplorerRig} from './character.js';
 import {Effects} from './effects.js';
 import {decoratePlayground} from './decor.js';
 import {decorateCaldera} from './caldera-scene.js';
+import {decorateHoarfrost} from './hoarfrost-scene.js';
+
+// Render-only dressing per world kind; the playground's has no updates.
+const DRESSING={caldera:decorateCaldera,hoarfrost:decorateHoarfrost};
+// Material response per shape style. Everything is vertex-coloured.
+const SURFACES={metal:{roughness:.45,metalness:.35},ice:{roughness:.24,metalness:.08},snow:{roughness:.97},
+  rock:{roughness:.93},wood:{roughness:.86},pine:{roughness:.9},cloth:{roughness:.8}};
 
 // Default look: the pale, green playground. A world may supply its own theme.
 const PLAYGROUND_THEME={background:'#b8c7bf',fog:['#b8c7bf',8000,16000],exposure:1.3,
@@ -32,6 +39,28 @@ gl_FragColor=vec4(color,1.0);
 #include <colorspace_fragment>
 #include <fog_fragment>
 }`;
+// Frostbite water: dark, cold, slowly turning, with drifting slush and glints.
+const FROST_FRAGMENT=`uniform float time;varying vec3 vWorld;
+#include <fog_pars_fragment>
+float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
+return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
+float fbm(vec2 p){float n=0.0,a=.55;for(int i=0;i<4;i++){n+=a*noise(p);p=p*2.07+vec2(3.1,8.3);a*=.5;}return n;}
+void main(){vec2 p=vWorld.xz/620.0;
+float n=fbm(p+vec2(time*.018,-time*.012));
+float ripple=sin(vWorld.x*.011+time*.8+n*6.0)*sin(vWorld.z*.013-time*.6+n*5.0);
+float slush=smoothstep(.66,.8,fbm(p*1.4+vec2(-time*.01,time*.008)+7.0));
+float glint=smoothstep(.9,1.0,ripple*.5+.5)*smoothstep(.45,.7,n);
+vec3 color=mix(vec3(.02,.10,.16),vec3(.08,.30,.40),n);
+color=mix(color,vec3(.72,.86,.93),slush*.3);
+color+=vec3(.55,.75,.85)*glint*.35;
+gl_FragColor=vec4(color,1.0);
+#include <tonemapping_fragment>
+#include <colorspace_fragment>
+#include <fog_fragment>
+}`;
+// The hazard floor (SURFACE_BURNING) is lava by default; a theme may redraw it.
+const HAZARD_SHADERS={lava:LAVA_FRAGMENT,frost:FROST_FRAGMENT};
 
 export class PlaygroundRenderer {
   constructor(canvas,world) {
@@ -78,14 +107,24 @@ export class PlaygroundRenderer {
     this.level=new T.Group();this.scene.add(this.level);
     this.scene.background=new T.Color(theme.background);
     this.scene.fog=new T.Fog(...theme.fog);
+    // A big world may see further; the default suits the smaller ones.
+    this.camera.far=theme.far??30000;this.camera.updateProjectionMatrix();
     this.renderer.toneMappingExposure=theme.exposure;
     this.hemisphere.color.set(theme.hemisphere[0]);this.hemisphere.groundColor.set(theme.hemisphere[1]);this.hemisphere.intensity=theme.hemisphere[2];
     this.sun.color.set(theme.sun[0]);this.sun.intensity=theme.sun[1];
-    this.shadow.material.color.set(theme.shadow);this.effects.dust=theme.dust;this.effects.clear();
+    this.shadow.material.color.set(theme.shadow);this.effects.dust=theme.dust;this.effects.hazard=theme.hazard??null;this.effects.clear();
     this.lava=[];this.meshes=[];
     // Optional lava bounce light, baked into vertex colors near the lake.
     const glow=theme.underglow&&new T.Color(theme.underglow.color),lit=new T.Color();
     for(const shape of world.shapes) {
+      // A hidden shape (e.g. a catch floor far below the clouds) still collides
+      // and still shows in the collision wireframe; it just is not drawn.
+      if(shape.style==='hidden') {
+        const hidden=new T.BufferGeometry().setAttribute('position',new T.Float32BufferAttribute(
+          world.triangles.slice(shape.start,shape.end).flatMap(t=>t.vertices.flat()),3));
+        this.wire.add(new T.LineSegments(new T.WireframeGeometry(hidden),new T.LineBasicMaterial({color:'#174f49',depthTest:false,transparent:true,opacity:.55})));
+        hidden.dispose();continue;
+      }
       const positions=[],colors=[];
       for(const triangle of world.triangles.slice(shape.start,shape.end)) {
         const color=new T.Color(triangle.color);
@@ -100,21 +139,22 @@ export class PlaygroundRenderer {
       geometry.setAttribute('color',new T.Float32BufferAttribute(colors,3));
       geometry.computeVertexNormals();
       let material;
-      if(shape.style==='lava') {
-        material=new T.ShaderMaterial({vertexShader:LAVA_VERTEX,fragmentShader:LAVA_FRAGMENT,fog:true,
+      const hazard=HAZARD_SHADERS[shape.style];
+      if(hazard) {
+        material=new T.ShaderMaterial({vertexShader:LAVA_VERTEX,fragmentShader:hazard,fog:true,
           uniforms:T.UniformsUtils.merge([T.UniformsLib.fog,{time:{value:0}}])});
         this.lava.push(material);
-      } else material=new T.MeshStandardMaterial({vertexColors:true,roughness:shape.style==='metal'?.45:.9,metalness:shape.style==='metal'?.35:0});
+      } else material=new T.MeshStandardMaterial({vertexColors:true,roughness:.9,metalness:0,...SURFACES[shape.style]});
       const mesh=new T.Mesh(geometry,material);
-      mesh.castShadow=shape.style!=='lava';mesh.receiveShadow=shape.style!=='lava';
+      mesh.castShadow=!hazard;mesh.receiveShadow=!hazard;
       this.level.add(mesh);this.meshes.push(mesh);
-      if(shape.style!=='lava') {
+      if(!hazard) {
         const edges=new T.LineSegments(new T.EdgesGeometry(geometry,12),new T.LineBasicMaterial({color:theme.edges[0],transparent:true,opacity:theme.edges[1]}));
         this.level.add(edges);
       }
       this.wire.add(new T.LineSegments(new T.WireframeGeometry(geometry),new T.LineBasicMaterial({color:'#174f49',depthTest:false,transparent:true,opacity:.55})));
     }
-    this.dressing=world.kind==='caldera'?decorateCaldera(this.level,world,this):(decoratePlayground(this.level,world),null);
+    this.dressing=DRESSING[world.kind]?.(this.level,world,this)??(decoratePlayground(this.level,world),null);
     this.pickups=world.pickups.map((pickup,i)=>this.pickup(pickup,i));
   }
   pickup(pickup,index) {
@@ -126,14 +166,15 @@ export class PlaygroundRenderer {
       coin.rotation.x=Math.PI/2;const holder=new T.Group();holder.add(coin);group.add(holder);parts.spin.push(holder);
       const rim=new T.Mesh(new T.TorusGeometry(30,2.4,6,24),glow('#fff0a8','#d08a10',.6));holder.add(rim);
     } else if(pickup.kind==='shard') {
-      const gem=new T.Mesh(new T.OctahedronGeometry(26),glow('#ff4d4d','#b3001b',.9,{flatShading:true}));
+      const [gemColor,gemGlow,haloColor]=this.theme.shard??['#ff4d4d','#b3001b','#ff7a6a'];
+      const gem=new T.Mesh(new T.OctahedronGeometry(26),glow(gemColor,gemGlow,.9,{flatShading:true}));
       gem.scale.set(.75,1.35,.75);group.add(gem);parts.spin.push(gem);
-      const halo=new T.Mesh(new T.TorusGeometry(40,2.5,6,32),new T.MeshBasicMaterial({color:'#ff7a6a',transparent:true,opacity:.7}));
+      const halo=new T.Mesh(new T.TorusGeometry(40,2.5,6,32),new T.MeshBasicMaterial({color:haloColor,transparent:true,opacity:.7}));
       group.add(halo);parts.counter.push(halo);
     } else if(pickup.kind==='star'||pickup.kind==='bonus') {
       const shape=new T.Shape();
       for(let i=0;i<=10;i++){const r=i%2?32:78,a=i/10*Math.PI*2;shape[i?'lineTo':'moveTo'](Math.sin(a)*r,Math.cos(a)*r);}
-      const color=pickup.kind==='star'?['#ffd54a','#ff9d00']:['#ff5a4f','#c4001e'];
+      const color=this.theme.stars?.[pickup.kind]??(pickup.kind==='star'?['#ffd54a','#ff9d00']:['#ff5a4f','#c4001e']);
       const geometry=new T.ExtrudeGeometry(shape,{depth:22,bevelEnabled:true,bevelThickness:9,bevelSize:6,bevelSegments:2});
       geometry.center();
       const star=new T.Mesh(geometry,glow(color[0],color[1],.75,{metalness:.3,flatShading:true}));star.castShadow=true;

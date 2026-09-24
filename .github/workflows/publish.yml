@@ -33,27 +33,19 @@ jobs:
         run: python3 tools/package_browser.py
       - uses: actions/upload-artifact@v4
         with:
-          name: smooth64-browser-v0.6.0
+          name: smooth64-browser-v0.7.1
           path: dist/
-      - name: Publish the original music release
+      - name: Publish the controller menus release
         env:
           GH_TOKEN: ${{ github.token }}
         # Re-running (e.g. after a merge to main) refreshes the files instead of failing.
         run: |
-          if gh release view playground-v0.6.0 >/dev/null 2>&1; then
-            gh release upload playground-v0.6.0 dist/Smooth64-Browser.zip dist/Smooth64-Play.html --clobber
-            gh release edit playground-v0.6.0 --title 'Smooth64 — Original music' \
-              --notes-file docs/releases/v0.6.0.md --latest
+          if gh release view playground-v0.7.1 >/dev/null 2>&1; then
+            gh release upload playground-v0.7.1 dist/Smooth64-Browser.zip dist/Smooth64-Play.html --clobber
+            gh release edit playground-v0.7.1 --title 'Smooth64 — Controller menus' \
+              --notes-file docs/releases/v0.7.1.md --latest
           else
-            gh release create playground-v0.6.0 dist/Smooth64-Browser.zip dist/Smooth64-Play.html \
-              --target "$GITHUB_SHA" --title 'Smooth64 — Original music' \
-              --notes-file docs/releases/v0.6.0.md --latest
-          fi
-      - name: Retire the replaced v0.5.0 release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        # v0.6.0 replaced its soundtrack. The release goes; its git tag stays as history.
-        run: |
-          if gh release view playground-v0.5.0 >/dev/null 2>&1; then
-            gh release delete playground-v0.5.0 --yes
+            gh release create playground-v0.7.1 dist/Smooth64-Browser.zip dist/Smooth64-Play.html \
+              --target "$GITHUB_SHA" --title 'Smooth64 — Controller menus' \
+              --notes-file docs/releases/v0.7.1.md --latest
           fi

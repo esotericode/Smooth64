@@ -241,9 +241,28 @@ export function createCaldera() {
 
   for(const c of checkpoints)pickup('checkpoint',`checkpoint-${c.id}`,...c.position);
   return {kind:'caldera',name:'Cinder Caldera',triangles,shapes,pickups,checkpoints,sections,zones:checkpoints,grates,
-    intro:{from:[1800,3900,1500],look:[0,3250,0]},
+    intro:{from:[1800,3900,1500],look:[0,3250,0]},text,
     theme:{background:'#2a1a2c',fog:['#3a2131',5200,16000],exposure:1.1,
       hemisphere:['#d8cce8','#c05a2e',1.95],sun:['#ffe6cc',2.5],sunOffset:[-2600,6800,2400],
       edges:['#ffe2c4',.16],dust:'#a8988f',shadow:'#140a0e',
       underglow:{color:'#ff4a12',height:170,strength:.5}}};
 }
+
+// Player-facing copy, read by main.js.
+const text={
+  start:'Reach the Ember Star at the summit. Start through the broken gate.',
+  shard:'Ember Shard',shards:'Ember Shards',
+  reveal:'Every shard found! The Crimson Star waits on the lava altar.',
+  objectives:[
+    {icon:'★',title:'Ember Star',note:'Reach the summit.',star:'ember-star'},
+    {icon:'♦',title:'Ember Shards',note:'Explore the hidden challenges.',shards:true},
+    {icon:'★',title:'Crimson Star',note:'Find every shard, then visit the lava altar.',star:'crimson-star',needsShards:true},
+  ],
+  victory(kind,{session,shards,best}) {
+    if(kind==='star')return {title:'Ember Star claimed.',
+      copy:session.found.has('crimson-star')?'Both stars are yours. The caldera is conquered!':shards.found===shards.total?'The summit is yours. The Crimson Star waits on the lava altar.'
+        :`The summit is yours${best?` · best ${best}`:''}. ${shards.total-shards.found} Ember Shards still hide in the caldera.`};
+    return {title:'Crimson Star claimed.',
+      copy:session.found.has('ember-star')?'Both stars are yours. The caldera is conquered!':'Every shard is yours. The Ember Star still waits at the summit.'};
+  },
+};

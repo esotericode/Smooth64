@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {GameAudio,soundCue,transitionCues} from '../web/audio.js';
+import {GameAudio,soundCue,transitionCues,COIN_CHIME} from '../web/audio.js';
 import {MARKER,SAMPLES} from '../web/sounds.js';
 import {loadCore} from '../web/engine.js';
 
@@ -90,6 +90,27 @@ test('sound IDs decode by bank, with terrain offsets, and unknown IDs stay silen
   assert.deepEqual(transitionCues('ACT_LEDGE_GRAB','ACT_LEDGE_GRAB'),[]);
 });
 
+test('Hoarfrost Heights: gusts over wind floors, snow and ice underfoot, and water that splashes',async()=>{
+  const id=(bank,sound,flags=0x04)=>(bank<<28|flags<<24|sound<<16|0x8081)>>>0;
+  assert.deepEqual(soundCue(id(4,0x10)),{bed:'wind'});assert.equal(soundCue(id(4,0x11)),null);
+  // The core requests the wind on every tick spent over a wind floor.
+  const wind=await trace(Array(10).fill([0,0,0]),FLAT.map(t=>({...t,type:0x2C})));
+  assert.ok(wind.every(t=>cues([t]).includes('wind')));
+  const {ctx,audio}=await ready({random:()=>.5}),s={velocity:[0,0,0],speed:32};
+  const step=terrain=>{const before=ctx.started.length;audio.tick([id(0,0x10+terrain,6)],s,s,'ACT_WALKING','ACT_WALKING');return ctx.started[before].playbackRate.value;};
+  const plain=[0,1,3].map(step);
+  audio.setTheme({terrain:[5,6,2,3,4,5,6,7],hazard:'frost'});
+  const [snow,ice,rock]=[0,1,3].map(step);
+  assert.ok(snow<plain[0]&&ice>plain[1]&&rock===plain[2],'snow crunches low, ice rings high, rock is unchanged');
+  audio.tick(wind[0].sounds,s,s,'ACT_IDLE','ACT_IDLE');assert.ok(audio.beds.wind.amp.gain.value>0,'a wind bed');
+  audio.tick([],s,s,'ACT_IDLE','ACT_IDLE');assert.equal(audio.beds.wind,undefined,'the wind drops with the floor');
+  const [touch]=await trace([[0,0,0]],FLAT.map(t=>({...t,type:1})));
+  const before=ctx.started.length;audio.tick(touch.sounds,touch.previous,touch.s,'ACT_IDLE',touch.name);
+  assert.ok(ctx.started.slice(before).some(source=>source.buffer===audio.samples.splash.buffer),'frostbite water splashes');
+  assert.ok(audio.beds.fizz&&!audio.beds.burn,'and fizzes instead of crackling');
+  audio.setTheme();assert.deepEqual(audio.beds,{},'a new world hushes the beds');assert.equal(step(0),plain[0]);
+});
+
 test('the sprite is sliced at the sync marker, even when a decoder adds delay',async()=>{
   for(const delay of [0,.026]) {
     const {audio}=await ready({delay});
@@ -137,8 +158,24 @@ test('every cue names real samples, and pickups have distinct voices',async()=>{
   for(const cue of ['coin','shard','star','reveal','checkpoint','beacon','lose','hurt','falling','scorch','click','grab','kick','touch','whoa','oof']) {
     const before=ctx.started.length;audio.cue(cue);assert.ok(ctx.started.length>before,`${cue} plays`);
   }
-  const first=cue=>{const before=ctx.started.length;audio.cue(cue);return sampleOf(ctx.started[before]);};
+  const first=cue=>{const before=ctx.started.length;audio.cue(cue);return ctx.started[before].buffer;};
   assert.equal(new Set(['coin','shard','star','reveal','lose'].map(first)).size,5);
+});
+
+test('coins chime softly: two low mallet notes, generated, in place of the bright sample',async()=>{
+  const {ctx,audio}=await ready(),before=ctx.started.length;audio.cue('coin');
+  const [source]=ctx.started.slice(before),{buffer}=source;
+  assert.equal(buffer,audio.samples.mallet.buffer,'the generated chime, not the sprite\'s coin');
+  assert.ok(Math.abs(buffer.duration-COIN_CHIME.seconds)<1e-9&&buffer.duration<.5,'short');
+  // Its zero crossings put it between C5 and G5 (the sprite's coin rang near 3 kHz).
+  const data=buffer.getChannelData(0);let crossings=0;
+  for(let i=1;i<data.length;i++)if((data[i-1]<0)!==(data[i]<0))crossings++;
+  const pitch=crossings/2/buffer.duration;assert.ok(pitch>500&&pitch<800,`pitch ${pitch}`);
+  // Peak-normalised like the sprite's samples, with a measured loudness to balance it by.
+  assert.ok(Math.abs(Math.max(...data.map(Math.abs))-.891)<1e-3);
+  assert.ok(audio.samples.mallet.level<-6&&audio.samples.mallet.level>-30,`level ${audio.samples.mallet.level}`);
+  // A soft attack: no click at the onset.
+  assert.ok(Math.abs(data[0])<.01&&Math.abs(data[48])<.5);
 });
 
 test('music starts with play, follows its own volume, muffles, ducks under jingles and sleeps with the tab',async()=>{
