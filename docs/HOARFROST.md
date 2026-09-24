@@ -98,7 +98,7 @@ These numbers come from driving the unchanged core. Design gaps and slopes aroun
 - **Colour tells the player what a surface does:** white snow is safe, blue is ice (you slide), bright white is deep snow, grey rock grips, and the gale's paths are a shade greyer than snow. Keep that language.
 - **Checkpoints must stand on flat floors** (the spawn test compares heights exactly).
 - **Coins belong to the checkpoint whose stretch they sit on** (`section` = the checkpoint's name): the menu counts coins per checkpoint. Coins over a gap (tracing a jump) need `{arc:true}` and a test that a real jump collects them.
-- **Triangle count:** there is no cap. Collision is a linear scan, about 25 µs per 1,000 triangles per tick, which play never notices; the route proofs simulate hundreds of thousands of ticks, though, so they slow as a level grows.
+- **Triangle count:** there is no cap, and collision cost does not grow with it: the core keeps static triangles in a grid, so a check only visits the triangles near it (about 8 µs a tick here).
 - **Walls and slabs get a snow `lip`** (a band of the top colour on each wall) so terraces read as snow over rock or ice.
 - **The camera sees up to 44,000** (`theme.far`), and fog runs 8,000–38,000. The sky dome, aurora and stars follow the camera.
 - **Far away, the depth buffer is coarse** (about 4 units at 25,000 with the near plane at 10), so dressing must never lay one surface just over another there: the distant peaks are a rock base and a snow cap meeting at one ring, not a cap sitting on a cone. Overlays that hug a face (the falls' glint, windows, painted titles) use `polygonOffset`.

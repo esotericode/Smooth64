@@ -113,16 +113,20 @@
   },
   "patches": {
     "vendor/libsm64/src/decomp/engine/surface_collision.c": {
-      "sha256": "02bac367333b1e586bc894e4dbf6a4b686e9c7d78a132a0554b502d6bb803d6b",
-      "why": "Floor and ceiling point-in-triangle tests use 64-bit products: in 32 bits they overflowed for triangles over ~46,000 units across, which then vanished."
+      "sha256": "8538c4dd0bfb332af8f9e50295c8d8f0cb37b4ec68a54ead17e9bb07fea99596",
+      "why": "Floor and ceiling point-in-triangle tests use 64-bit products: in 32 bits they overflowed for triangles over ~46,000 units across, which then vanished. Floor, ceiling and wall queries read the static surfaces from the grid cell at the query point (see load_surfaces.c), in load order."
     },
     "vendor/libsm64/src/decomp/engine/surface_collision.h": {
       "sha256": "a8ff9a7a6c5648f548c103058ebc6886484c5740e6b47237c0ed7797794810d8",
       "why": "The \"no ceiling\" and \"no floor\" heights are 1e9 and -1.1e9 (libsm64 had 100,000 and -110,000), so tall and deep worlds have no invisible ceiling or missing floors."
     },
     "vendor/libsm64/src/load_surfaces.c": {
-      "sha256": "989d0f88638b954cfa2114fe2d5a7b0457c496630dd94505bb8c3821149dbf09",
-      "why": "Triangle normals use 64-bit products: in 32 bits a large triangle's normal wrapped and could flip a floor into a ceiling."
+      "sha256": "03f54ec9951fad5357b64c728134965482a8b2026a725eb29cfcd48897b2c180",
+      "why": "Triangle normals use 64-bit products: in 32 bits a large triangle's normal wrapped and could flip a floor into a ceiling. The static surfaces get a grid, as the original game kept, so a query visits only the surfaces that could match it, in load order: results are unchanged, and the cost no longer grows with the world."
+    },
+    "vendor/libsm64/src/load_surfaces.h": {
+      "sha256": "8e556f90bffaca6c99c568984ae0871abd2830fa3f5bb14787940005b45b9eee",
+      "why": "Declares loaded_static_cell, the grid lookup used by surface_collision.c."
     }
   }
 }

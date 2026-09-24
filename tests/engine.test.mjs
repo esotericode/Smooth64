@@ -97,6 +97,28 @@ test('no arbitrary limits: any number of triangles, far-flung, huge, towering an
   assert.throws(()=>core.loadWorld(square(600000000,0,1000,0)));
 });
 
+test('collision cost does not grow with the world: the static surfaces sit in a grid',async()=>{
+  const core=await loadCore(bytes);
+  const square=(x0,z0,size,y)=>[{type:0,vertices:[[x0,y,z0],[x0,y,z0+size],[x0+size,y,z0+size]]},{type:0,vertices:[[x0,y,z0],[x0+size,y,z0+size],[x0+size,y,z0]]}];
+  // The same run on 2 triangles and on 40,000 (a full scan of every surface made it ~800 times slower).
+  const time=world=>{core.loadWorld(world);let best=Infinity;
+    for(let r=0;r<5;r++){core.reset([1000,0,1000],0);const t=performance.now();
+      for(let i=0;i<200;i++)core.tick({x:i%60<30?40:-40,y:80,buttons:i%25<5?1:0,yaw:0});best=Math.min(best,performance.now()-t);}
+    return best;};
+  const big=[];for(let i=0;i<100;i++)for(let j=0;j<200;j++)big.push(...square(-100000+i*2000,-200000+j*2000,2000,0));
+  const small=time(square(-4000,-4000,8000,0)),large=time(big);
+  assert.ok(large<small*10,`40,000 triangles took ${(large/small).toFixed(1)} times as long as 2`);
+  // A cell holds every surface a query in it could touch. Walls 1,100 apart sit at every
+  // offset from the 1,024-unit cell edges; each run stops at the next wall's reach, 50 units short.
+  const wall=k=>-22000+k*1100,walls=[];
+  for(let k=0;k<40;k++)walls.push({type:0,vertices:[[wall(k),0,-3000],[wall(k),0,3000],[wall(k),400,3000]]},{type:0,vertices:[[wall(k),0,-3000],[wall(k),400,3000],[wall(k),400,-3000]]});
+  core.loadWorld([...square(-30000,-30000,60000,0),...walls]);
+  for(let k=0;k<39;k++) {
+    core.reset([wall(k)+60,0,0],16384);let s;for(let i=0;i<45;i++)s=core.tick({x:0,y:80,buttons:0,yaw:49152});
+    assert.equal(Math.round(wall(k+1)-s.position[0]),50,`wall ${k+1}`);
+  }
+});
+
 test('pause/reset clears fractional accumulated time',()=>{
   const clock=new FixedClock();let ticks=0;
   clock.advance(.02,()=>ticks++);clock.reset();clock.advance(.02,()=>ticks++);

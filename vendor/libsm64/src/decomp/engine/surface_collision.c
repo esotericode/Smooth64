@@ -15,11 +15,14 @@ static struct SM64SurfaceCollisionData *find_ceil_from_list( s32 x, s32 y, s32 z
 
     ceil = NULL;
 
+    // Smooth64: the static surfaces come from the grid cell at the point, in load order.
+    const uint32_t *cell;
+    uint32_t cellCount = loaded_static_cell( x, z, &cell );
     uint32_t groupCount = loaded_surface_iter_group_count();
     for( int i = 0; i < groupCount; ++i ) {
-    uint32_t surfCount = loaded_surface_iter_group_size( i );
+    uint32_t surfCount = i ? loaded_surface_iter_group_size( i ) : cellCount;
     for( int j = 0; j < surfCount; ++j ) {
-        surf = loaded_surface_iter_get_at_index( i, j );
+        surf = loaded_surface_iter_get_at_index( i, i || !cell ? j : cell[j] );
 
         // libsm64: Weed out surfaces whose triangles are actually line segs. TODO do this at surface load time
         if( !surf->isValid ) continue;
@@ -92,11 +95,14 @@ static struct SM64SurfaceCollisionData *find_floor_from_list( s32 x, s32 y, s32 
     f32 height;
     struct SM64SurfaceCollisionData *floor = NULL;
 
+    // Smooth64: the static surfaces come from the grid cell at the point, in load order.
+    const uint32_t *cell;
+    uint32_t cellCount = loaded_static_cell( x, z, &cell );
     uint32_t groupCount = loaded_surface_iter_group_count();
     for( int i = 0; i < groupCount; ++i ) {
-    uint32_t surfCount = loaded_surface_iter_group_size( i );
+    uint32_t surfCount = i ? loaded_surface_iter_group_size( i ) : cellCount;
     for( int j = 0; j < surfCount; ++j ) {
-        surf = loaded_surface_iter_get_at_index( i, j );
+        surf = loaded_surface_iter_get_at_index( i, i || !cell ? j : cell[j] );
 
         // libsm64: Weed out surfaces whose triangles are actually line segs. TODO do this at surface load time
         if( !surf->isValid ) continue;
@@ -169,11 +175,14 @@ static s32 find_wall_collisions_from_list( struct SM64WallCollisionData *data) {
         radius = 200.0f;
     }
 
+    // Smooth64: the static surfaces come from the grid cell at the point, in load order.
+    const uint32_t *cell;
+    uint32_t cellCount = loaded_static_cell( x, z, &cell );
     uint32_t groupCount = loaded_surface_iter_group_count();
     for( int i = 0; i < groupCount; ++i ) {
-    uint32_t surfCount = loaded_surface_iter_group_size( i );
+    uint32_t surfCount = i ? loaded_surface_iter_group_size( i ) : cellCount;
     for( int j = 0; j < surfCount; ++j ) {
-        surf = loaded_surface_iter_get_at_index( i, j );
+        surf = loaded_surface_iter_get_at_index( i, i || !cell ? j : cell[j] );
 
         // libsm64: Weed out surfaces whose triangles are actually line segs. TODO do this at surface load time
         if( !surf->isValid ) continue;
