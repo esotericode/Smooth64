@@ -1,6 +1,6 @@
 # Smooth64: notes for Claude
 
-A ROM-free browser platformer on the original SM64 movement code (C core compiled to `web/smooth64.wasm`; Three.js only draws). Three worlds: Cinder Caldera (`web/caldera.js`), Hoarfrost Heights (`web/hoarfrost.js`), and the movement playground (`web/world.js`).
+A ROM-free browser platformer on the original SM64 movement code (C core compiled to `web/smooth64.wasm`; Three.js only draws). Four worlds: Cinder Caldera (`web/caldera.js`), Hoarfrost Heights (`web/hoarfrost.js`), the movement playground (`web/world.js`), and The Expanse (`web/expanse.js`), a big open world for testing size.
 
 ## Commands
 

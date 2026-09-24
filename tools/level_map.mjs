@@ -1,5 +1,5 @@
 // Top-down SVG map of a level's collision floors, for planning and review.
-//   node tools/level_map.mjs [hoarfrost|caldera|playground] [out.svg]
+//   node tools/level_map.mjs [hoarfrost|caldera|playground|expanse] [out.svg]
 // Floors are coloured by height, surfaces that behave differently get their
 // own colour, walls are dark lines, and coins, shards, stars and checkpoints
 // are marked. A world's `route` is drawn as a white line and any `reserved`
@@ -12,6 +12,7 @@ const makers={
   hoarfrost:async()=>(await import('../web/hoarfrost.js')).createHoarfrost(),
   caldera:async()=>(await import('../web/caldera.js')).createCaldera(),
   playground:async()=>(await import('../web/world.js')).createWorld(),
+  expanse:async()=>(await import('../web/expanse.js')).createExpanse(),
 };
 const name=process.argv[2]||'hoarfrost',out=process.argv[3]||`build/maps/${name}.svg`;
 const world=await makers[name]();

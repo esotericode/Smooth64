@@ -7,14 +7,23 @@
 
 1. Download and extract the ZIP.
 2. Double-click **Smooth64-Play.html**.
-3. Click **Cinder Caldera** or **Hoarfrost Heights** to play a level, or **Movement playground** for the test areas.
+3. Click **Cinder Caldera** or **Hoarfrost Heights** to play a level, **Movement playground** for the test areas, or **The Expanse** for a huge open space.
 
 Works offline in Edge, Chrome, or Firefox. No installation, Python, terminal, compiler, or ROM required. **WASD** moves, **Space** jumps, **Shift** crouches, **J** attacks. A standard gamepad works too, menus included. Sound and music start after your first click or key press.
 
 The original recovery ZIP is kept in this repository. The folders below contain the editable project source.
 
 
-A ROM-free platformer built around the Super Mario 64 US movement code, with an original explorer, a volcanic adventure, a mountain of ice to climb, and a connected practice playground.
+A ROM-free platformer built around the Super Mario 64 US movement code, with an original explorer, a volcanic adventure, a mountain of ice to climb, a connected practice playground, and a huge open world.
+
+## Version 0.8.0 — The Expanse, and an engine without limits
+
+- **The Expanse**, a fourth world for trying out size: rolling ground **240,000 units** across in about 39,000 triangles, where the engine used to stop at 65,534 units and 4,096 triangles. It has hills, a mountain 14,000 units high, over 500 crates, stacks and stone blocks, landmark towers, and coin trails out to the rims. Eight travel points reach every part of it, out to the **Far Corner**, about 153,000 units from the middle. Jump off a rim and you fall into the void and come back to your beacon.
+- **No arbitrary limits in the engine.** A world holds as many triangles as memory allows, coordinates reach ±536,870,912, and there is no invisible ceiling or missing floor far up or down. Two 32-bit overflows in the collision code are fixed: a single floor 64,000 units across used to vanish or turn into a ceiling.
+- **Collision cost no longer grows with the world.** The core keeps its triangles in a grid, as the original game did, so each check looks only at the triangles near it. A tick in the Expanse takes about 12 µs instead of 3.6 ms, the smaller worlds tick about 14 times faster, and the test suite runs in seconds.
+- **Movement is unchanged.** The old and new builds give identical state bytes and sounds on every tick of random play in all four worlds and among thousands of random walls, floors and ceilings.
+
+[The Expanse release notes](docs/releases/v0.8.0.md)
 
 ## Version 0.7.1 — menus for controllers, a softer coin
 
@@ -118,7 +127,7 @@ Clone this branch, then run:
 python3 tools/serve.py
 ```
 
-Open **http://localhost:8000** and select **Cinder Caldera**, **Hoarfrost Heights**, or **Movement playground**. On Windows, `py tools/serve.py` also works.
+Open **http://localhost:8000** and select **Cinder Caldera**, **Hoarfrost Heights**, **Movement playground**, or **The Expanse**. On Windows, `py tools/serve.py` also works.
 
 Python 3 and a current browser with WebGL 2/WebAssembly are all you need. The compiled movement core and renderer are included. No npm install, compiler, ROM, CDN, or account is needed to play. Opening `index.html` directly as a `file:` URL will not work; use the local server. The `web/` directory is also a complete static build suitable for a normal HTTP server.
 
@@ -160,7 +169,7 @@ The core's original timings apply; there is no added coyote time, automatic bunn
 ```text
 core/               Small C host and public API; movement timing/root-motion tables
 vendor/libsm64/     Pinned upstream C actions, math, collision adapter, and headers
-web/                Original levels (playground, Cinder Caldera, Hoarfrost Heights), geometry kit, procedural character rig, input, camera, and UI
+web/                Original levels (playground, Cinder Caldera, Hoarfrost Heights, The Expanse), geometry kit, procedural character rig, input, camera, and UI
 tests/              Behavioral checks and native ↔ WASM frame-by-frame comparisons
 tools/              Build, serve, import, and provenance checks
 docs/               Fidelity, architecture, and verification notes
