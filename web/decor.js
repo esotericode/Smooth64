@@ -6,7 +6,9 @@ export function groundText(group,text,x,y,z,width,color='#506d5b') {
   const context=c.getContext('2d');
   context.font='600 58px monospace';context.fillStyle=color;context.textAlign='center';context.textBaseline='middle';context.fillText(text,512,64);
   const texture=new T.CanvasTexture(c);texture.colorSpace=T.SRGBColorSpace;
-  const mesh=new T.Mesh(new T.PlaneGeometry(width,width/8),new T.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false}));
+  // Pulled toward the camera in depth, so the paint never flickers into the floor from afar.
+  const mesh=new T.Mesh(new T.PlaneGeometry(width,width/8),new T.MeshBasicMaterial({map:texture,transparent:true,depthWrite:false,
+    polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-8}));
   mesh.rotation.x=-Math.PI/2;mesh.position.set(x,y,z);group.add(mesh);
   return mesh;
 }

@@ -52,12 +52,13 @@ try {
   await page.waitForFunction(()=>window.__notes>20);
   assert.equal(await page.locator('#telemetry').isVisible(),false);assert.equal(await page.locator('#toolbar').isVisible(),false);
   assert.equal(await page.locator('#timer-hud').isVisible(),false);
-  const {SAMPLES}=await import(pathToFileURL(path.join(web,'sounds.js')).href);
+  const {SAMPLES}=await import(pathToFileURL(path.join(web,'sounds.js')).href),{COIN_CHIME}=await import(pathToFileURL(path.join(web,'audio.js')).href);
   const ms=name=>Math.round(SAMPLES[name][1]*1000),steps=['step1','step2','step3','step4','step5','step6'].map(ms);
   await page.keyboard.down('a');
   await page.waitForFunction(()=>Number(document.getElementById('coin-count').textContent)>0);
   // Running plays the core's footsteps; the pickup chimes.
-  await page.waitForFunction(([steps,coin])=>window.__sounds.filter(d=>steps.includes(d)).length>=2&&window.__sounds.includes(coin),[steps,ms('coin')]);
+  await page.waitForFunction(([steps,coin])=>window.__sounds.filter(d=>steps.includes(d)).length>=2&&window.__sounds.includes(coin),
+    [steps,Math.round(COIN_CHIME.seconds*1000)]);
   await page.keyboard.up('a');let savedCoins=await count(page);
   await page.screenshot({path:path.join(out,'caldera.png')});
   await openMenu(page);await page.locator('#setting-developer').check();await page.locator('#setting-timer').check();
@@ -130,6 +131,43 @@ try {
   const hud=await touch.locator('#level-hud').boundingBox();assert.ok(hud.x+hud.width<=390,'mobile HUD fits');
   await touch.context().browser().close();
   console.log('PASS touch controls, mobile HUD and scrollable pause menu');
+
+  // A gamepad alone: pick a world, pause, change settings, read the guide, travel and resume.
+  const pad=await pageFor({viewport:{width:1280,height:800}});
+  await pad.addInitScript(()=>{
+    const gamepad={mapping:'standard',connected:true,index:0,id:'Test pad',axes:[0,0,0,0],buttons:Array.from({length:17},()=>({pressed:false,value:0}))};
+    window.__pad=gamepad;window.__polls=0;Object.defineProperty(navigator,'getGamepads',{value:()=>(window.__polls++,[gamepad])});
+  });
+  await pad.goto(url);await ready(pad);
+  const [A,B,START,UP,DOWN,LEFT,RIGHT]=[0,1,9,12,13,14,15];
+  // Hold each button until the game has polled it twice (software rendering runs at a few frames a second).
+  const polled=()=>pad.evaluate(()=>window.__polls).then(from=>pad.waitForFunction(from=>window.__polls>=from+2,from));
+  const press=async button=>{
+    await pad.evaluate(b=>window.__pad.buttons[b].pressed=true,button);await polled();
+    await pad.evaluate(b=>window.__pad.buttons[b].pressed=false,button);await polled();
+  };
+  const focused=()=>pad.evaluate(()=>document.activeElement?.id||document.activeElement?.dataset.mode||document.activeElement?.tagName);
+  const reach=async(id,button)=>{for(let i=0;i<24&&await focused()!==id;i++)await press(button);assert.equal(await focused(),id);};
+  await press(DOWN);assert.equal(await focused(),'start-level','the first press shows the focus');
+  await press(DOWN);assert.equal(await focused(),'start-frost');
+  assert.equal(await pad.evaluate(()=>getComputedStyle(document.activeElement).outlineStyle),'solid','a visible focus ring');
+  await press(A);await pad.locator('#level-hud').waitFor();assert.match(await pad.locator('#world-name').textContent(),/Hoarfrost/);
+  await press(START);await pad.locator('#menu').waitFor({state:'visible'});assert.equal(await focused(),'resume-button');
+  await reach('setting-timer',DOWN);await press(A);assert.equal(await pad.locator('#setting-timer').isChecked(),true,'A toggles a setting');
+  await reach('setting-music',UP);await press(RIGHT);assert.equal(await pad.locator('#music-value').textContent(),'55%','right raises a slider');
+  await reach('menu-help',DOWN);await press(RIGHT);assert.equal(await focused(),'restart-world');await press(LEFT);
+  await press(A);await pad.locator('#help').waitFor({state:'visible'});
+  await press(DOWN);assert.ok(await pad.locator('#help').evaluate(el=>el.scrollTop>0),'down scrolls the move guide');
+  await press(B);await pad.locator('#help').waitFor({state:'hidden'});assert.equal(await pad.locator('#menu').evaluate(el=>el.open),true,'B closes only the guide');
+  await reach('zones-title',UP);await press(A);assert.equal(await pad.locator('#destinations').evaluate(el=>el.open),true);
+  await press(DOWN);assert.equal(await pad.evaluate(()=>document.activeElement.dataset.zone),'0');
+  await press(A);await pad.locator('#menu').waitFor({state:'hidden'});
+  assert.match(await pad.locator('#checkpoint-name').textContent(),/Frostmere Camp/);
+  await press(START);await pad.locator('#menu').waitFor({state:'visible'});await press(B);await pad.locator('#menu').waitFor({state:'hidden'});
+  assert.equal(await pad.locator('#timer-hud').isVisible(),true);
+  await pad.screenshot({path:path.join(out,'gamepad.png')});
+  await pad.context().browser().close();
+  console.log('PASS gamepad menus: world choice, pause, settings, sliders, guide scrolling, travel and resume');
 
   const offline=path.join(root,'dist/Smooth64-Play.html');
   assert.ok(existsSync(offline),'run tools/package_browser.py before this check');

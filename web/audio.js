@@ -39,10 +39,10 @@ const CUES={
   // Frostbite water: a generated splash under a low puff.
   splash:[[['splash'],-19,[.92,1.08]],[['poof1','poof2'],-25,[.55,.62]]],
   falling:[[['fall'],-20,[1,1]]],
-  // Gameplay cues from main.js.
-  coin:[[['coin'],-19,[1,1]]],
+  // Gameplay cues from main.js. Coins ring a generated mallet chime (COIN_CHIME).
+  coin:[[['mallet'],-24,[1,1]]],
   shard:[[['shard'],-17,[1,1]]],
-  star:[[['star'],-16,[1,1]],[['coin'],-23,[1.5,1.5],{delay:.62}]],
+  star:[[['star'],-16,[1,1]],[['mallet'],-23,[1.5,1.5],{delay:.62}]],
   reveal:[[['reveal'],-17,[1,1]]],
   checkpoint:[[['poof1'],-22,[.55,.6]],[['chime'],-21,[.5,.5],{delay:.05}]],
   beacon:[[['chime'],-26,[.5,.5]]],
@@ -89,6 +89,24 @@ export function transitionCues(previousName,name) {
   return cues;
 }
 
+// Coins: two soft mallet notes a fifth apart (C5, then G5), generated in code.
+// The sprite's bright arcade ding grew shrill a hundred coins into a level.
+export const COIN_CHIME={seconds:.46,notes:[[0,523.25,.6],[.075,783.99,.75]]};
+// Loudness as tools/build_sounds.py measures the sprite: RMS in dB of the
+// active part above ~150 Hz, so generated sounds balance like the samples.
+function loudness(data,rate) {
+  const k=Math.exp(-2*Math.PI*150/rate),out=new Float32Array(data.length);let y=0,previous=0,peak=0;
+  for(let i=0;i<data.length;i++){y=k*(y+data[i]-previous);previous=data[i];out[i]=y;peak=Math.max(peak,Math.abs(y));}
+  let sum=0,n=0;for(const v of out)if(Math.abs(v)>peak*.03){sum+=v*v;n++;}
+  return 10*Math.log10(sum/Math.max(1,n)+1e-12);
+}
+// A generated one-shot, peak-normalised to -1 dBFS like the sprite's samples.
+function tone(ctx,seconds,fill) {
+  const buffer=ctx.createBuffer(1,Math.round(ctx.sampleRate*seconds),ctx.sampleRate),data=buffer.getChannelData(0);
+  fill(data,ctx.sampleRate);const peak=data.reduce((m,v)=>Math.max(m,Math.abs(v)),0)||1;
+  for(let i=0;i<data.length;i++)data[i]*=.891/peak;
+  return {buffer,level:loudness(data,ctx.sampleRate)};
+}
 function noise(ctx,seconds,fill) {
   const buffer=ctx.createBuffer(1,Math.round(ctx.sampleRate*seconds),ctx.sampleRate),data=buffer.getChannelData(0);
   let seed=0x5eed;const random=()=>(seed=(Math.imul(seed,1664525)+1013904223)>>>0)/2147483648-1;
@@ -193,6 +211,14 @@ export class GameAudio {
       let low=0;for(let i=0;i<data.length;i++){const t=i/rate,open=.08+.9*Math.exp(-t*14);low+=(random()-low)*open;data[i]=low*Math.exp(-t*9)*(1-Math.exp(-t*400));}
     });
     this.samples.splash={buffer:splash,level:-20};
+    // The coin chime: each note a sine with two quieter overtones that fade
+    // faster, like a soft mallet, after a 4 ms attack.
+    this.samples.mallet=tone(this.ctx,COIN_CHIME.seconds,(data,rate)=>{
+      for(const [start,frequency,gain] of COIN_CHIME.notes)for(let i=Math.round(start*rate);i<data.length;i++) {
+        const t=i/rate-start,w=2*Math.PI*frequency*t;
+        data[i]+=gain*Math.min(1,t/.004)*(Math.sin(w)*Math.exp(-t*10)+.22*Math.sin(2*w)*Math.exp(-t*18)+.06*Math.sin(3*w)*Math.exp(-t*30));
+      }
+    });
   }
   get ready() {return !!this.samples&&this.ctx?.state==='running'&&this.volume>0;}
   setVolume(value) {

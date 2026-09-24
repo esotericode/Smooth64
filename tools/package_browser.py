@@ -71,6 +71,7 @@ No installation, account, internet connection, Python, terminal, or ROM needed.
 WASD / arrow keys: move    Space: jump    Shift: crouch    J: attack/dive
 Drag the view: camera     R: checkpoint  Controls button: full move guide
 Escape / P: pause menu    Gamepad Start: pause menu
+Gamepad in menus: D-pad or left stick moves, A picks, B goes back.
 
 SOUND: starts after your first click or key press. Menu > Settings > Sound
 effects sets the volume, and Menu > Settings > Music sets the quiet background

@@ -164,15 +164,18 @@ export function decorateHoarfrost(group,world,renderer) {
       const angle=i/16*Math.PI*2+random()*.2,r=21000+random()*5000,height=5000+random()*8000,radius=3000+random()*3500;
       const x=Math.cos(angle)*r,z=-2000-Math.sin(angle)*r*1.1;
       if(z<-9000&&Math.abs(x)<11000)continue; // keep the Horn's silhouette clear
-      const base=new T.Mesh(new T.ConeGeometry(radius,height,6+(i%3)),rock);base.position.set(x,-1200+height/2,z);base.rotation.y=random()*3;group.add(base);
-      const cap=new T.Mesh(new T.ConeGeometry(radius*.45,height*.45,6+(i%3)),snow);cap.position.set(x,-1200+height*.775+2,z);cap.rotation.y=base.rotation.y;group.add(cap);
+      // Rock below, snow above, meeting at one ring: overlapping surfaces this
+      // far away flicker, since the depth buffer cannot tell them apart.
+      const sides=6+(i%3),spin=random()*3;
+      const base=new T.Mesh(new T.CylinderGeometry(radius*.45,radius,height*.55,sides,1,true),rock);base.position.set(x,-1200+height*.275,z);base.rotation.y=spin;group.add(base);
+      const cap=new T.Mesh(new T.ConeGeometry(radius*.45,height*.45,sides,1,true),snow);cap.position.set(x,-1200+height*.775,z);cap.rotation.y=spin;group.add(cap);
     }
     // Rock islands poking out of the clouds, each with a few pines.
     const pineGeometry=new T.ConeGeometry(160,620,6);pineGeometry.translate(0,310,0);
     const pines=new T.InstancedMesh(pineGeometry,new T.MeshStandardMaterial({color:'#35574a',roughness:.9,flatShading:true}),90);
     const m=new T.Matrix4(),q=new T.Quaternion(),s=new T.Vector3();let n=0;
     for(const [x,z,r,top] of [[-14500,9000,1800,300],[12500,12000,1500,-100],[15500,-1500,2200,900],[-16000,-3000,2000,1200],[-12500,15500,1300,-200],[9500,16500,1600,0]]) {
-      const island=new T.Mesh(new T.CylinderGeometry(r,r*.45,2600,7),rock);island.position.set(x,top-1300,z);group.add(island);
+      const island=new T.Mesh(new T.CylinderGeometry(r,r*.45,2600,7,1,true),rock);island.position.set(x,top-1300,z);group.add(island);
       const cap=new T.Mesh(new T.CylinderGeometry(r*1.02,r,90,7),snow);cap.position.set(x,top-40,z);group.add(cap);
       for(let k=0;k<15&&n<90;k++,n++) {
         const a=random()*Math.PI*2,d=Math.sqrt(random())*r*.8,scale=.7+random()*.9;
@@ -240,7 +243,8 @@ export function decorateHoarfrost(group,world,renderer) {
   }
   // ---- The Shoulder: the hut's windows and smoke, and the sign for the trail west. ----
   {
-    const glowPane=new T.MeshBasicMaterial({color:'#ffc27a',transparent:true,opacity:.85,blending:T.AdditiveBlending,depthWrite:false,side:T.DoubleSide});
+    const glowPane=new T.MeshBasicMaterial({color:'#ffc27a',transparent:true,opacity:.85,blending:T.AdditiveBlending,depthWrite:false,side:T.DoubleSide,
+      polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-8});
     for(const x of [5650,5950]){const pane=new T.Mesh(new T.PlaneGeometry(90,110),glowPane);pane.position.set(x,4480,-9199);group.add(pane);}
     const pipe=new T.Mesh(new T.CylinderGeometry(24,24,180,8),new T.MeshStandardMaterial({color:'#3b3f4a',roughness:.6,metalness:.4}));
     pipe.position.set(6000,4740,-9350);group.add(pipe);
@@ -291,12 +295,12 @@ export function decorateHoarfrost(group,world,renderer) {
   // ---- The Frozen Falls: a glint runs slowly down the frozen curtain. ----
   {
     const material=new T.ShaderMaterial({vertexShader:SHEET_VERTEX,fragmentShader:CURTAIN_FRAGMENT,transparent:true,depthWrite:false,fog:true,
-      uniforms:T.UniformsUtils.merge([T.UniformsLib.fog,{time:{value:0}}])});
+      polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-8,uniforms:T.UniformsUtils.merge([T.UniformsLib.fog,{time:{value:0}}])});
     // Just proud of the ice face, under the overhang and beside it; the streaks
     // are scaled to the world, so the two sheets meet seamlessly.
     for(const [x0,x1,y1] of [[-1000,350,5600],[350,1550,6400]]) {
       const geometry=new T.PlaneGeometry(x1-x0,y1-CLOUD+100),uv=geometry.attributes.uv,position=geometry.attributes.position;
-      geometry.translate((x0+x1)/2,(y1+CLOUD-100)/2,-10247);
+      geometry.translate((x0+x1)/2,(y1+CLOUD-100)/2,-10242);
       for(let i=0;i<uv.count;i++)uv.setXY(i,position.getX(i)/1200,position.getY(i)/2400);
       group.add(new T.Mesh(geometry,material));
     }
@@ -370,7 +374,8 @@ export function decorateHoarfrost(group,world,renderer) {
       for(let k=0;k<n;k++) {
         const t=(k+.5)/n,x=p[0]+(q[0]-p[0])*t,y=p[1]+(q[1]-p[1])*t-260,z=p[2]+(q[2]-p[2])*t;
         if(world.horn(x,z)>y-60)continue; // the track runs on the Horn itself here
-        const floor=ground(x,z,y-1),height=y-floor,r=45+height/90;
+        // Each pillar runs into the deck above and the ground below, so no face lies flush.
+        const floor=ground(x,z,y-1)-40,height=y+20-floor,r=45+height/90;
         const pillar=new T.Mesh(new T.CylinderGeometry(r,r*1.25,height,6),pier);pillar.position.set(x,floor+height/2,z);group.add(pillar);
       }
     }

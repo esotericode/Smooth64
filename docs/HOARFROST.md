@@ -101,6 +101,7 @@ These numbers come from driving the unchanged core. Design gaps and slopes aroun
 - **Budget:** the level is capped by `BUDGET` (3,000) in `web/hoarfrost.js`. The core holds 4,096 triangles; collision is a linear scan, so ~4,000 is fine at 30 Hz, but test searches get slower with every triangle.
 - **Walls and slabs get a snow `lip`** (a band of the top colour on each wall) so terraces read as snow over rock or ice.
 - **The camera sees up to 44,000** (`theme.far`), and fog runs 8,000–38,000. The sky dome, aurora and stars follow the camera.
+- **Far away, the depth buffer is coarse** (about 4 units at 25,000 with the near plane at 10), so dressing must never lay one surface just over another there: the distant peaks are a rock base and a snow cap meeting at one ring, not a cap sitting on a cone. Overlays that hug a face (the falls' glint, windows, painted titles) use `polygonOffset`.
 
 Learned on the upper Horn:
 

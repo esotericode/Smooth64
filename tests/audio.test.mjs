@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {GameAudio,soundCue,transitionCues} from '../web/audio.js';
+import {GameAudio,soundCue,transitionCues,COIN_CHIME} from '../web/audio.js';
 import {MARKER,SAMPLES} from '../web/sounds.js';
 import {loadCore} from '../web/engine.js';
 
@@ -158,8 +158,24 @@ test('every cue names real samples, and pickups have distinct voices',async()=>{
   for(const cue of ['coin','shard','star','reveal','checkpoint','beacon','lose','hurt','falling','scorch','click','grab','kick','touch','whoa','oof']) {
     const before=ctx.started.length;audio.cue(cue);assert.ok(ctx.started.length>before,`${cue} plays`);
   }
-  const first=cue=>{const before=ctx.started.length;audio.cue(cue);return sampleOf(ctx.started[before]);};
+  const first=cue=>{const before=ctx.started.length;audio.cue(cue);return ctx.started[before].buffer;};
   assert.equal(new Set(['coin','shard','star','reveal','lose'].map(first)).size,5);
+});
+
+test('coins chime softly: two low mallet notes, generated, in place of the bright sample',async()=>{
+  const {ctx,audio}=await ready(),before=ctx.started.length;audio.cue('coin');
+  const [source]=ctx.started.slice(before),{buffer}=source;
+  assert.equal(buffer,audio.samples.mallet.buffer,'the generated chime, not the sprite\'s coin');
+  assert.ok(Math.abs(buffer.duration-COIN_CHIME.seconds)<1e-9&&buffer.duration<.5,'short');
+  // Its zero crossings put it between C5 and G5 (the sprite's coin rang near 3 kHz).
+  const data=buffer.getChannelData(0);let crossings=0;
+  for(let i=1;i<data.length;i++)if((data[i-1]<0)!==(data[i]<0))crossings++;
+  const pitch=crossings/2/buffer.duration;assert.ok(pitch>500&&pitch<800,`pitch ${pitch}`);
+  // Peak-normalised like the sprite's samples, with a measured loudness to balance it by.
+  assert.ok(Math.abs(Math.max(...data.map(Math.abs))-.891)<1e-3);
+  assert.ok(audio.samples.mallet.level<-6&&audio.samples.mallet.level>-30,`level ${audio.samples.mallet.level}`);
+  // A soft attack: no click at the onset.
+  assert.ok(Math.abs(data[0])<.01&&Math.abs(data[48])<.5);
 });
 
 test('music starts with play, follows its own volume, muffles, ducks under jingles and sleeps with the tab',async()=>{

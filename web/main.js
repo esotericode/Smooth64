@@ -10,6 +10,7 @@ import {HEALTH,healthWedges,respawnReason} from './rules.js';
 import {loadSettings,saveSettings,SETTING_RANGES} from './settings.js';
 import {actionCue} from './pose.js';
 import {GameAudio} from './audio.js';
+import {area,controls,nearest} from './menus.js';
 
 const $=id=>document.getElementById(id);
 const canvas=$('game'),menu=$('menu'),help=$('help'),victory=$('victory');
@@ -210,6 +211,41 @@ function command(key) {
   }
   return false;
 }
+// Gamepad menus: the open dialog, or the welcome screen before play.
+function menuRoots() {
+  const dialog=[victory,help,menu].find(d=>d.open);
+  return dialog?[dialog]:started?[]:[$('welcome'),document.querySelector('.header-actions')];
+}
+function navigate(action) {
+  document.body.classList.add('pad-nav');
+  const roots=menuRoots();if(!roots.length)return false;
+  const items=controls(roots),here=items.includes(document.activeElement)?document.activeElement:null;
+  // Start picks the focused world on the welcome screen; otherwise it opens or closes the menu.
+  if(action==='start')return !started&&!!here&&(here.click(),true);
+  if(action==='back')return roots[0].tagName==='DIALOG'&&command('Escape');
+  // The first press shows where focus is: the dialog's own choice, or the first world.
+  if(!here) {
+    const first=items.find(el=>el.autofocus)??items.find(el=>el.classList.contains('primary'))??items[0];
+    first?.focus();if(action==='accept')first?.click();return true;
+  }
+  if(action==='accept'){if(here.type!=='range')here.click();return true;}
+  if(here.type==='range'&&(action==='left'||action==='right')) {
+    if(action==='left')here.stepDown();else here.stepUp();
+    here.dispatchEvent(new Event('input',{bubbles:true}));return true;
+  }
+  const target=items[nearest(area(here),items.map(area),action)];
+  // In a long dialog, scroll toward the next control a step at a time, so
+  // text between controls (the move guide) can be read on the way.
+  const box=roots[0];
+  if((action==='up'||action==='down')&&box.scrollHeight>box.clientHeight) {
+    const view=box.getBoundingClientRect(),sign=action==='down'?1:-1,rect=target&&area(target);
+    const hidden=rect?(sign>0?rect.bottom-view.bottom+16:view.top+16-rect.top):Infinity;
+    const room=sign>0?box.scrollHeight-box.clientHeight-box.scrollTop:box.scrollTop;
+    if(hidden>0&&room>0){const by=Math.min(hidden,view.height*.6,room);box.scrollBy(0,sign*by);if(by<hidden)return true;}
+  }
+  if(target){target.focus({preventScroll:true});target.scrollIntoView({block:'nearest'});}
+  return true;
+}
 function drawPowerMeter(health) {
   const wedges=healthWedges(health);if(wedges===meterWedges)return;meterWedges=wedges;
   const meter=$('power-meter'),ctx=meter.getContext('2d');
@@ -274,7 +310,7 @@ function renderHud() {
   ctx.fillStyle='#d37537';ctx.beginPath();ctx.arc(50+lastInput.x/80*30,50-lastInput.y/80*30,6,0,Math.PI*2);ctx.fill();
 }
 function frame(now) {
-  const dt=Math.min((now-last)/1000||0,.1);last=now;input.pollCommands();
+  const dt=Math.min((now-last)/1000||0,.1);last=now;input.pollCommands(!started||modalOpen(),now);
   if(paused()||respawning)audio.hush();
   audio.pauseMusic(modalOpen());
   if(started&&!modalOpen()) {
@@ -324,6 +360,8 @@ for(const button of document.querySelectorAll('[data-mode]'))button.addEventList
   menu.close();
 });
 window.addEventListener('blur',()=>{if(started&&!modalOpen())openMenu();});
+// The gamepad's focus ring gives way to the mouse, touch or keyboard.
+for(const type of ['pointerdown','keydown','wheel'])window.addEventListener(type,()=>document.body.classList.remove('pad-nav'),{capture:true,passive:true});
 document.addEventListener('visibilitychange',()=>{audio.setHidden(document.hidden);if(document.hidden&&started&&!modalOpen())openMenu();});
 
 try {
@@ -332,7 +370,7 @@ try {
   const [wasm,actionResponse]=await Promise.all([fetch('smooth64.wasm'),fetch('actions.json')]);
   if(!wasm.ok||!actionResponse.ok)throw new Error('Could not load the game files.');
   [core,actions]=await Promise.all([wasm.arrayBuffer().then(loadCore),actionResponse.json()]);
-  renderer=new PlaygroundRenderer(canvas);input=new Input(canvas,command);setMode('caldera');
+  renderer=new PlaygroundRenderer(canvas);input=new Input(canvas,command);input.onNavigate=navigate;setMode('caldera');
   renderer.camera.position.set(2700,4000,6200);renderer.camera.lookAt(0,1700,0);
   $('start').disabled=false;$('start-level').disabled=false;$('start-frost').disabled=false;$('menu-button').disabled=false;
   write('status','Ready when you are.');requestAnimationFrame(frame);
