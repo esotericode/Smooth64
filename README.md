@@ -9,12 +9,20 @@
 2. Double-click **Smooth64-Play.html**.
 3. Click **Cinder Caldera** or **Hoarfrost Heights** to play a level, or **Movement playground** for the test areas.
 
-Works offline in Edge, Chrome, or Firefox. No installation, Python, terminal, compiler, or ROM required. **WASD** moves, **Space** jumps, **Shift** crouches, **J** attacks. Sound and music start after your first click or key press.
+Works offline in Edge, Chrome, or Firefox. No installation, Python, terminal, compiler, or ROM required. **WASD** moves, **Space** jumps, **Shift** crouches, **J** attacks. A standard gamepad works too, menus included. Sound and music start after your first click or key press.
 
 The original recovery ZIP is kept in this repository. The folders below contain the editable project source.
 
 
 A ROM-free platformer built around the Super Mario 64 US movement code, with an original explorer, a volcanic adventure, a mountain of ice to climb, and a connected practice playground.
+
+## Version 0.7.1 — menus for controllers, a softer coin
+
+- **Every menu works from a gamepad.** On the welcome screen, in the pause menu, the move guide and the star screen, the D-pad or left stick moves between choices, **A** selects, **B** goes back, and left or right sets a slider. Long pages scroll as you go, and an orange ring shows where you are.
+- **A gentler coin.** The bright arcade ding is replaced by two soft mallet notes, generated in code: it rings around 520 Hz instead of 3 kHz, and plays 5 dB quieter.
+- **No more flicker on the far peaks.** In Hoarfrost Heights, the distant mountains' snow caps no longer shimmer against their rock at a distance, and a few overlays that could do the same (the frozen falls' glint, the hut's windows, painted titles) now stay steady.
+
+[Controller and polish release notes](docs/releases/v0.7.1.md)
 
 ## Version 0.7.0 — Hoarfrost Heights
 
@@ -129,7 +137,8 @@ The playground contains a runway, walkable ramps, a steep slippery slope, a wall
 | Advance one tick (developer tools) | N | On-screen button |
 | Quarter speed (developer tools) | T | On-screen button |
 | Collision mesh (developer tools) | V | On-screen button |
-| Move guide | ? or H | Controls button |
+| Move guide | ? or H | Menu → Controls & moves |
+| Menus: move / select / back | Tab / Space or Enter / Escape | D-pad or left stick / A / B |
 | Sound and music volume, stick dead zone | Menu → Settings | Start → Settings |
 
 Touch devices get an analog pad and A/B/Z buttons. Keyboard buttons retain very short taps until the next simulation tick. Gamepad input is sampled on simulation ticks, with a 15% radial dead zone on both sticks. Losing window focus pauses the simulation and clears keyboard input.
